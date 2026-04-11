@@ -1,4 +1,4 @@
-# UoN Event Management Platform
+# UON Event Management Platform
 
 A web-based full-stack application designed to streamline event creation, management, and registration for organizers and attendees.
 
@@ -93,6 +93,35 @@ DP07-UON-EM-platform/
 ```
 
 ---- 
+
+### ⚠️ Notes
+	•	Make sure backend is running before starting frontend
+	•	Use correct API URLs when connecting frontend
+
+  ```code
+---
+
+# 🧠 Why this is good
+
+This README now:
+- ✅ Helps anyone run the project instantly  
+- ✅ Shows real progress  
+- ✅ Looks professional for submission  
+- ✅ Matches your actual current state (no fake features)
+
+---
+
+# 🔥 Next
+
+After you paste this:
+
+Say:
+**README done**
+
+Then we move to:
+👉 **connecting Login frontend → backend (your main dev task)**
+```
+----
 
 ## ⚡ Quick Start
 
