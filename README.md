@@ -95,11 +95,10 @@ DP07-UON-EM-platform/
 ---- 
 
 ### ⚠️ Notes
-	•	Make sure backend is running before starting frontend
-	•	Use correct API URLs when connecting frontend
+- Make sure backend is running before starting frontend
+- Use correct API URLs when connecting frontend
 
-  ```code
----
+ ```code
 
 # 🧠 Why this is good
 
@@ -109,17 +108,6 @@ This README now:
 - ✅ Looks professional for submission  
 - ✅ Matches your actual current state (no fake features)
 
----
-
-# 🔥 Next
-
-After you paste this:
-
-Say:
-**README done**
-
-Then we move to:
-👉 **connecting Login frontend → backend (your main dev task)**
 ```
 ----
 
