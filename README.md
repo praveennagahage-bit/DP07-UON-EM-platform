@@ -61,6 +61,38 @@ http://localhost:5173
 ```
 ---
 
+### 🔗 API Endpoints (Current)
+
+Register User
+
+```code
+POST /register
+```
+
+Body: 
+``` json
+{
+  "username": "test",
+  "password": "1234"
+}
+```
+
+### 🧠 Project Structure (Current)
+
+```code
+DP07-UON-EM-platform/
+│
+├── server.js          # Backend server
+├── database.js        # Database setup
+├── users.db           # SQLite database
+│
+└── client/            # Frontend (React)
+    ├── src/
+    ├── package.json
+
+```
+
+---- 
 
 ## ⚡ Quick Start
 
