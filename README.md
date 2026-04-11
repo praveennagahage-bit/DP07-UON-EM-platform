@@ -30,13 +30,13 @@ git clone https://github.com/praveennagahage-bit/DP07-UON-EM-platform.git
 cd DP07-UON-EM-platform
 ```
 
-# 2.  Install Backend Dependencies
+### 2.  Install Backend Dependencies
 
 ```bash
 npm install
 ```
 
-# 3. Run Backend Server
+### 3. Run Backend Server
 ```bash
 node server.js
 ```
@@ -44,7 +44,7 @@ node server.js
 Server should run on:
 http://localhost:3000 (or similar)
 
-# 4. Run Frontend
+### 4. Run Frontend
 
 Open a new terminal:
 
@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-# Frontend will run on:
+#### Frontend will run on:
 
 ```bash
 http://localhost:5173 
