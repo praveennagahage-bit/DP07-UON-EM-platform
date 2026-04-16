@@ -1,65 +1,97 @@
 import { useState } from "react";
 
 function CreateEvent() {
-  const [formData, setFormData] = useState({
-    title: "",
-    date: "",
-    venue: "",
-  });
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [venue, setVenue] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Event Created:", formData);
+    alert("Event Created!");
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Create Event</h1>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        marginTop: "50px"
+      }}
+    >
+      <div
+        style={{
+          width: "400px",
+          background: "#fff",
+          padding: "30px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.1)"
+        }}
+      >
+        <h2 style={{ marginBottom: "20px" }}>Create Event</h2>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Title:</label><br />
+        <form onSubmit={handleSubmit}>
+          
+          {/* TITLE */}
+          <label>Event Title</label>
           <input
             type="text"
-            name="title"
-            onChange={handleChange}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             required
+            style={inputStyle}
           />
-        </div>
 
-        <div>
-          <label>Date:</label><br />
+          {/* DATE */}
+          <label>Date</label>
           <input
             type="date"
-            name="date"
-            onChange={handleChange}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             required
+            style={inputStyle}
           />
-        </div>
 
-        <div>
-          <label>Venue:</label><br />
+          {/* VENUE */}
+          <label>Venue</label>
           <input
             type="text"
-            name="venue"
-            onChange={handleChange}
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
             required
+            style={inputStyle}
           />
-        </div>
 
-        <button type="submit" style={{ marginTop: "10px" }}>
-          Create Event
-        </button>
-      </form>
+          {/* BUTTON */}
+          <button
+            type="submit"
+            style={{
+              marginTop: "20px",
+              width: "100%",
+              padding: "10px",
+              background: "#4f46e5",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            Create Event
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
+
+// 🔥 reusable style
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginTop: "5px",
+  marginBottom: "15px",
+  borderRadius: "6px",
+  border: "1px solid #ccc"
+};
 
 export default CreateEvent;

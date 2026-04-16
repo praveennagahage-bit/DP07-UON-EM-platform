@@ -1,7 +1,12 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import logo from "../assets/unilogo.jpg";
 
 function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // 🔥 TEMP login state (we will make dynamic later)
+  const isLoggedIn = false;
 
   const linkStyle = (path) => ({
     marginRight: "20px",
@@ -20,35 +25,40 @@ function Navbar() {
         justifyContent: "space-between",
         padding: "15px 40px",
         background: "#fff",
-        borderBottom: "1px solid #ddd",
+        borderBottom: "1px solid #ddd"
       }}
     >
-      {/* LEFT: LOGO + TITLE */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <img
-          src="https://upload.wikimedia.org/wikipedia/en/thumb/2/2b/University_of_Newcastle_Australia_logo.svg/1200px-University_of_Newcastle_Australia_logo.svg.png"
-          alt="logo"
-          style={{ width: "40px" }}
-        />
-        <div>
-          <strong>University of Newcastle</strong>
-          <div style={{ fontSize: "12px", color: "#555" }}>
-            Event Management Platform
-          </div>
-        </div>
-      </div>
 
+      {/* LEFT: LOGO */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+       {/* LOGO */}
+  <img
+    src={logo}
+    alt="uon logo"
+    style={{ width: "40px" }}
+  />
+
+  {/* TEXT */}
+  <div>
+    <div style={{ fontWeight: "bold", fontSize: "16px" }}>
+      University of Newcastle
+    </div>
+    <div style={{ fontSize: "12px", color: "#666" }}>
+      Event Management Platform
+    </div>
+  </div>
+
+</div>
       {/* CENTER NAV */}
       <div>
         <Link to="/" style={linkStyle("/")}>Home</Link>
         <Link to="/events" style={linkStyle("/events")}>Events</Link>
-        <Link to="/bookings" style={linkStyle("/bookings")}>My Bookings</Link>
-        <Link to="/create" style={linkStyle("/create")}>Create Event</Link>
+        <Link to="/create" style={linkStyle("/create")}>Create</Link>
       </div>
 
       {/* RIGHT SIDE */}
       <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-        
+
         {/* SEARCH */}
         <input
           type="text"
@@ -63,28 +73,42 @@ function Navbar() {
         {/* NOTIFICATION */}
         <span style={{ fontSize: "18px" }}>🔔</span>
 
-        {/* PROFILE */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {/* PROFILE / AUTH */}
+        {isLoggedIn ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div
+              style={{
+                width: "35px",
+                height: "35px",
+                borderRadius: "50%",
+                background: "#4f46e5",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: "bold"
+              }}
+            >
+              JD
+            </div>
+            <div>
+              <div style={{ fontSize: "14px" }}>John Doe</div>
+              <div style={{ fontSize: "12px", color: "#555" }}>Student</div>
+            </div>
+          </div>
+        ) : (
           <div
+            onClick={() => navigate("/auth")}
             style={{
-              width: "35px",
-              height: "35px",
-              borderRadius: "50%",
-              background: "#4f46e5",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: "bold"
+              cursor: "pointer",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              background: "#f5f5f5"
             }}
           >
-            JD
+            Sign In / Sign Up
           </div>
-          <div>
-            <div style={{ fontSize: "14px" }}>John Doe</div>
-            <div style={{ fontSize: "12px", color: "#555" }}>Student</div>
-          </div>
-        </div>
+        )}
 
       </div>
     </nav>
