@@ -1,9 +1,12 @@
 const express = require('express');
+const cors = require('cors');
 const db = require('./database');
+
 const app = express();
 const PORT = 3000;
 
-// Parse JSON request body
+// Middleware
+app.use(cors());
 app.use(express.json());
 
 // Test route
@@ -13,21 +16,24 @@ app.get('/', (req, res) => {
 
 // Register route
 app.post('/register', (req, res) => {
-    const { username, password } = req.body;
+    const { firstName, lastName, email, role, password } = req.body;
 
-    if (!username || !password) {
+    if (!firstName || !lastName || !email || !role || !password) {
         return res.status(400).json({
-            message: 'Username and password are required'
+            message: 'All fields are required'
         });
     }
 
-    const sql = `INSERT INTO users (username, password) VALUES (?, ?)`;
+    const sql = `
+        INSERT INTO users (firstName, lastName, email, role, password)
+        VALUES (?, ?, ?, ?, ?)
+    `;
 
-    db.run(sql, [username, password], function (err) {
+    db.run(sql, [firstName, lastName, email, role, password], function (err) {
         if (err) {
             if (err.message.includes('UNIQUE constraint failed')) {
                 return res.status(400).json({
-                    message: 'Username already exists'
+                    message: 'Email already exists'
                 });
             }
 
@@ -45,17 +51,17 @@ app.post('/register', (req, res) => {
 
 // Login route
 app.post('/login', (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!username || !password) {
+    if (!email || !password) {
         return res.status(400).json({
-            message: 'Username and password are required'
+            message: 'Email and password are required'
         });
     }
 
-    const sql = `SELECT * FROM users WHERE username = ? AND password = ?`;
+    const sql = `SELECT * FROM users WHERE email = ? AND password = ?`;
 
-    db.get(sql, [username, password], (err, row) => {
+    db.get(sql, [email, password], (err, row) => {
         if (err) {
             return res.status(500).json({
                 message: 'Database error'
@@ -67,12 +73,15 @@ app.post('/login', (req, res) => {
                 message: 'Login successful',
                 user: {
                     id: row.id,
-                    username: row.username
+                    firstName: row.firstName,
+                    lastName: row.lastName,
+                    email: row.email,
+                    role: row.role
                 }
             });
         } else {
             res.status(401).json({
-                message: 'Invalid username or password'
+                message: 'Invalid email or password'
             });
         }
     });
