@@ -12,9 +12,12 @@ export default function AuthPage() {
   // "login"  -> Login form
   const [mode, setMode] = useState("signup");
 
+  // Stores currently selected social sign up option for UI highlighting only
+  const [selectedProvider, setSelectedProvider] = useState("google");
+
   // Stores login form input values
   const [loginForm, setLoginForm] = useState({
-    username: "",
+    email: "",
     password: "",
   });
 
@@ -103,15 +106,11 @@ export default function AuthPage() {
     setMessage("");
 
     try {
-      
-      // NOTE:
-      // Current backend only supports:
-      // username + password
+      // Backend now supports:
+      // firstName, lastName, email, role, and password
       //
-      // So for now, email is being sent as username.
-      // firstName, lastName, and role are only frontend fields for now
-      // until backend/database are upgraded.
-      
+      // Social buttons are currently UI-only and are not sent to backend.
+
       const response = await fetch("http://localhost:3000/register", {
         method: "POST",
         headers: {
@@ -119,7 +118,10 @@ export default function AuthPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          username: signupForm.email,
+          firstName: signupForm.firstName,
+          lastName: signupForm.lastName,
+          email: signupForm.email,
+          role: signupForm.role,
           password: signupForm.password,
         })
       });
@@ -231,8 +233,20 @@ export default function AuthPage() {
 
             {/* Social auth buttons - UI only for now */}
             <div className="social-buttons">
-              <button type="button">G Google</button>
-              <button type="button">◉ GitHub</button>
+              <button
+                type="button"
+                className={selectedProvider === "google" ? "active" : ""}
+                onClick={() => setSelectedProvider("google")}
+              >
+                G Google
+              </button>
+              <button
+                type="button"
+                className={selectedProvider === "github" ? "active" : ""}
+                onClick={() => setSelectedProvider("github")}
+              >
+                 GitHub
+              </button>
             </div>
 
             {/* Divider between social login and form */}
@@ -310,9 +324,6 @@ export default function AuthPage() {
                   />
                 </label>
 
-                {/* Small helper note under password */}
-                <p className="helper-text">Must be at least 8 characters.</p>
-
                 {/* Show error if present */}
                 {error && <p className="form-error">{error}</p>}
 
@@ -328,14 +339,14 @@ export default function AuthPage() {
               // Otherwise show login form
               <form className="auth-form" onSubmit={handleLoginSubmit}>
 
-                {/* Username field */}
+                {/* Email field */}
                 <label>
-                  Username
+                  Email
                   <input
-                    type="text"
-                    name="username"
-                    placeholder="Enter your username"
-                    value={loginForm.username}
+                    type="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    value={loginForm.email}
                     onChange={handleLoginChange}
                     required
                   />
@@ -391,5 +402,3 @@ export default function AuthPage() {
     </div>
   );
 }
-
-
