@@ -7,6 +7,7 @@ import "./auth.css";
 // Main auth page component
 // This page contains BOTH Sign Up and Login in one screen
 export default function AuthPage() {
+  const [showPassword, setShowPassword] = useState(false);
   // mode decides which form is visible:
   // "signup" -> Sign Up form
   // "login"  -> Login form
@@ -14,7 +15,7 @@ export default function AuthPage() {
 
   // Stores login form input values
   const [loginForm, setLoginForm] = useState({
-    username: "",
+    email: "",
     password: "",
   });
 
@@ -119,9 +120,12 @@ export default function AuthPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          username: signupForm.email,
+          firstName: signupForm.firstName,
+          lastName: signupForm.lastName,
+          email: signupForm.email,
+          role: signupForm.role,
           password: signupForm.password,
-        })
+})
       });
 
       // Convert backend response to object
@@ -147,11 +151,9 @@ export default function AuthPage() {
       <div className="auth-shell">
 
         {/* Left design / marketing panel */}
-        <div className="auth-left"
-          style={{
-            backgroundImage: "url('https://i.pinimg.com/736x/f6/04/7b/f6047bbf9d396b24a91799a1df469c7c.jpg')"
-          }}
-          >
+        <div className="auth-left" >
+   
+          
           <div className="auth-left-content">
 
             {/* Main heading changes depending on current mode */}
@@ -271,17 +273,22 @@ export default function AuthPage() {
                 </label>
 
                 {/* Password field */}
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    name="password"
-                    placeholder="Enter your password"
-                    value={signupForm.password}
-                    onChange={handleSignupChange}
-                    required
-                  />
-                </label>
+                <div style={{ position: "relative" }}>
+  <input
+    type={showPassword ? "text" : "password"}
+    name="password"
+    placeholder="Enter your password"
+    value={signupForm.password}
+    onChange={handleSignupChange}
+    required
+  />
+  <span
+    onClick={() => setShowPassword(!showPassword)}
+    style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#aaa" }}
+  >
+    {showPassword ? "🙈" : "😒"}
+  </span>
+</div>
 
                 {/* Small helper note under password */}
                 <p className="helper-text">Must be at least 8 characters.</p>
@@ -301,31 +308,38 @@ export default function AuthPage() {
               // Otherwise show login form
               <form className="auth-form" onSubmit={handleLoginSubmit}>
 
-                {/* Username field */}
+                {/* Email field */}
                 <label>
-                  Username
+                  Email
                   <input
-                    type="text"
-                    name="username"
-                    placeholder="Enter your username"
-                    value={loginForm.username}
+                    type="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    value={loginForm.email}
                     onChange={handleLoginChange}
                     required
                   />
                 </label>
 
                 {/* Password field */}
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    name="password"
-                    placeholder="Enter your password"
-                    value={loginForm.password}
-                    onChange={handleLoginChange}
-                    required
-                  />
-                </label>
+               {/* Password field */}
+<label>Password</label>
+<div style={{ position: "relative" }}>
+  <input
+    type={showPassword ? "text" : "password"}
+    name="password"
+    placeholder="Enter your password"
+    value={loginForm.password}
+    onChange={handleLoginChange}
+    required
+  />
+  <span
+    onClick={() => setShowPassword(!showPassword)}
+    style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#aaa" }}
+  >
+    {showPassword ? "🙈" : "👁"}
+  </span>
+</div>
 
                 {/* Show error if present */}
                 {error && <p className="form-error">{error}</p>}
