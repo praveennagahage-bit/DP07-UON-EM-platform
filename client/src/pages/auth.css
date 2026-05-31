@@ -8,21 +8,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 0px 0px;
   color: white;
 }
 
 .auth-shell {
   width: 100%;
-  max-width: 1080px;
-  min-height: 620px;
+  height: 100vh; /* full screen Height */
   background: #000;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.06);
 }
-
+/*
 .auth-left {
   background:
     radial-gradient(circle at 75% 20%, rgba(36, 255, 186, 0.22), transparent 20%),
@@ -32,10 +31,25 @@
   align-items: flex-end;
   padding: 48px 36px;
 }
+*/
+
+.auth-left {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: flex-end;
+  position: relative; 
+}
+.auth-left-content {
+  height: 400px;
+  padding-left: 30px;
+}
 
 .auth-left-content h1 {
-  font-size: 3rem;
-  line-height: 1.05;
+  font-size: 50px;
+  line-height: 1.00;
+  font-weight: 900;
   margin: 0 0 14px;
   max-width: 280px;
 }
@@ -62,9 +76,12 @@
   color: rgba(255,255,255,0.8);
 }
 
-.step-card.active {
+
+.step-card:hover {
   background: #f4f4f4;
-  color: #111;
+  color:#111;
+  cursor: pointer;
+  transition: 0.2s ease; 
 }
 
 .step-card span {
@@ -100,7 +117,9 @@
 
 .auth-form-wrap {
   width: 100%;
-  max-width: 360px;
+  height: 600px;
+  max-width: 580px;
+  
 }
 
 .auth-toggle {
@@ -128,7 +147,7 @@
 .auth-form-wrap h2 {
   margin: 0 0 8px;
   text-align: center;
-  font-size: 1.8rem;
+  font-size: 2.8rem;
 }
 
 .form-subtext {
@@ -270,15 +289,6 @@
 
   .auth-left-content h1 {
     font-size: 2.2rem;
+    
   }
-}
-
-.social-buttons button {
-  transition: all 0.2s ease;
-}
-
-.social-buttons button.active {
-  background: #f3f3f3;
-  color: #111;
-  border: 1px solid #f3f3f3;
 }

@@ -12,12 +12,9 @@ export default function AuthPage() {
   // "login"  -> Login form
   const [mode, setMode] = useState("signup");
 
-  // Stores currently selected social sign up option for UI highlighting only
-  const [selectedProvider, setSelectedProvider] = useState("google");
-
   // Stores login form input values
   const [loginForm, setLoginForm] = useState({
-    email: "",
+    username: "",
     password: "",
   });
 
@@ -106,11 +103,15 @@ export default function AuthPage() {
     setMessage("");
 
     try {
-      // Backend now supports:
-      // firstName, lastName, email, role, and password
+      
+      // NOTE:
+      // Current backend only supports:
+      // username + password
       //
-      // Social buttons are currently UI-only and are not sent to backend.
-
+      // So for now, email is being sent as username.
+      // firstName, lastName, and role are only frontend fields for now
+      // until backend/database are upgraded.
+      
       const response = await fetch("http://localhost:3000/register", {
         method: "POST",
         headers: {
@@ -118,10 +119,7 @@ export default function AuthPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          firstName: signupForm.firstName,
-          lastName: signupForm.lastName,
-          email: signupForm.email,
-          role: signupForm.role,
+          username: signupForm.email,
           password: signupForm.password,
         })
       });
@@ -149,7 +147,11 @@ export default function AuthPage() {
       <div className="auth-shell">
 
         {/* Left design / marketing panel */}
-        <div className="auth-left">
+        <div className="auth-left"
+          style={{
+            backgroundImage: "url('https://i.pinimg.com/736x/f6/04/7b/f6047bbf9d396b24a91799a1df469c7c.jpg')"
+          }}
+          >
           <div className="auth-left-content">
 
             {/* Main heading changes depending on current mode */}
@@ -187,39 +189,8 @@ export default function AuthPage() {
         {/* Right side form panel */}
         <div className="auth-right">
           <div className="auth-form-wrap">
-
             {/* Toggle buttons to switch between login and sign up */}
-            <div className="auth-toggle">
-              <button
-                className={mode === "login" ? "active" : ""}
-                onClick={() => {
-                  // Switch to login form
-                  setMode("login");
-
-                  // Clear messages when switching form
-                  setError("");
-                  setMessage("");
-                }}
-                type="button"
-              >
-                Login
-              </button>
-
-              <button
-                className={mode === "signup" ? "active" : ""}
-                onClick={() => {
-                  // Switch to sign up form
-                  setMode("signup");
-
-                  // Clear messages when switching form
-                  setError("");
-                  setMessage("");
-                }}
-                type="button"
-              >
-                Sign Up
-              </button>
-            </div>
+           
 
             {/* Form heading changes with mode */}
             <h2>{mode === "signup" ? "Sign Up Account" : "Login Account"}</h2>
@@ -233,20 +204,8 @@ export default function AuthPage() {
 
             {/* Social auth buttons - UI only for now */}
             <div className="social-buttons">
-              <button
-                type="button"
-                className={selectedProvider === "google" ? "active" : ""}
-                onClick={() => setSelectedProvider("google")}
-              >
-                G Google
-              </button>
-              <button
-                type="button"
-                className={selectedProvider === "github" ? "active" : ""}
-                onClick={() => setSelectedProvider("github")}
-              >
-                 GitHub
-              </button>
+              <button type="button">G Google</button>
+              <button type="button">◉ GitHub</button>
             </div>
 
             {/* Divider between social login and form */}
@@ -324,6 +283,9 @@ export default function AuthPage() {
                   />
                 </label>
 
+                {/* Small helper note under password */}
+                <p className="helper-text">Must be at least 8 characters.</p>
+
                 {/* Show error if present */}
                 {error && <p className="form-error">{error}</p>}
 
@@ -339,14 +301,14 @@ export default function AuthPage() {
               // Otherwise show login form
               <form className="auth-form" onSubmit={handleLoginSubmit}>
 
-                {/* Email field */}
+                {/* Username field */}
                 <label>
-                  Email
+                  Username
                   <input
-                    type="email"
-                    name="email"
-                    placeholder="Enter your email"
-                    value={loginForm.email}
+                    type="text"
+                    name="username"
+                    placeholder="Enter your username"
+                    value={loginForm.username}
                     onChange={handleLoginChange}
                     required
                   />
@@ -402,3 +364,5 @@ export default function AuthPage() {
     </div>
   );
 }
+
+
