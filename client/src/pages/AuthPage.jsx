@@ -1,5 +1,6 @@
 // Import React's useState hook to store and update component state
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 // Import the CSS file that styles this auth page
 import "./auth.css";
@@ -7,7 +8,8 @@ import "./auth.css";
 // Main auth page component
 // This page contains BOTH Sign Up and Login in one screen
 export default function AuthPage() {
-  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
+
   // mode decides which form is visible:
   // "signup" -> Sign Up form
   // "login"  -> Login form
@@ -24,7 +26,9 @@ export default function AuthPage() {
     firstName: "",
     lastName: "",
     email: "",
+    confirmEmail: "",
     password: "",
+    confirmPassword: "",
     role: "attendee",
   });
 
@@ -40,7 +44,10 @@ export default function AuthPage() {
     const { name, value } = e.target;
 
     // Copy previous form values and update the changed input
-    setLoginForm((prev) => ({ ...prev, [name]: value }));
+    setLoginForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   // Handles typing inside the sign up form
@@ -49,7 +56,10 @@ export default function AuthPage() {
     const { name, value } = e.target;
 
     // Copy previous form values and update the changed input
-    setSignupForm((prev) => ({ ...prev, [name]: value }));
+    setSignupForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   // Handles login form submission
@@ -61,16 +71,29 @@ export default function AuthPage() {
     setError("");
     setMessage("");
 
+    // Check whether email is empty
+    if (!loginForm.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+
+    // Check whether password is empty
+    if (!loginForm.password) {
+      setError("Password is required");
+      return;
+    }
+
     try {
       // Send login data to backend
       const response = await fetch("http://localhost:3000/login", {
         method: "POST",
         headers: {
           // Tell backend we are sending JSON
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
+
         // Send the login form object as JSON
-        body: JSON.stringify(loginForm)
+        body: JSON.stringify(loginForm),
       });
 
       // Convert backend response into JavaScript object
@@ -85,9 +108,11 @@ export default function AuthPage() {
       // If successful, show success message
       setMessage("Login successful");
 
-      // Save logged-in user info in browser local storage
-      // This can be used later for session-like behavior on frontend
+      // Save logged-in user information
       localStorage.setItem("uonUser", JSON.stringify(data.user));
+
+      // Redirect to Home page after successful login
+      navigate("/");
     } catch (err) {
       // If request fails completely (server down, network issue, etc.)
       setError("Could not connect to server");
@@ -103,29 +128,77 @@ export default function AuthPage() {
     setError("");
     setMessage("");
 
+    // Check whether first name is empty
+    if (!signupForm.firstName.trim()) {
+      setError("First name is required");
+      return;
+    }
+
+    // Check whether last name is empty
+    if (!signupForm.lastName.trim()) {
+      setError("Last name is required");
+      return;
+    }
+
+    // Check whether email is empty
+    if (!signupForm.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+
+    // Check whether confirm email is empty
+    if (!signupForm.confirmEmail.trim()) {
+      setError("Please confirm your email");
+      return;
+    }
+
+    // Check whether both email fields match
+    if (
+      signupForm.email.trim().toLowerCase() !==
+      signupForm.confirmEmail.trim().toLowerCase()
+    ) {
+      setError("Email addresses do not match");
+      return;
+    }
+
+    // Check whether password is empty
+    if (!signupForm.password) {
+      setError("Password is required");
+      return;
+    }
+
+    // Check whether confirm password is empty
+    if (!signupForm.confirmPassword) {
+      setError("Please confirm your password");
+      return;
+    }
+
+    // Check whether both password fields match
+    if (signupForm.password !== signupForm.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     try {
-      
-      // NOTE:
-      // Current backend only supports:
-      // username + password
+      // Backend now supports:
+      // firstName, lastName, email, role, and password
       //
-      // So for now, email is being sent as username.
-      // firstName, lastName, and role are only frontend fields for now
-      // until backend/database are upgraded.
-      
+      // Social buttons are currently UI-only and are not sent to backend.
+
       const response = await fetch("http://localhost:3000/register", {
         method: "POST",
         headers: {
           // Tell backend the request body is JSON
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           firstName: signupForm.firstName,
           lastName: signupForm.lastName,
           email: signupForm.email,
           role: signupForm.role,
           password: signupForm.password,
-})
+        }),
       });
 
       // Convert backend response to object
@@ -151,14 +224,14 @@ export default function AuthPage() {
       <div className="auth-shell">
 
         {/* Left design / marketing panel */}
-        <div className="auth-left" >
-   
-          
+        <div className="auth-left">
           <div className="auth-left-content">
 
             {/* Main heading changes depending on current mode */}
             <h1>
-              {mode === "signup" ? "Get Started with Us" : "Welcome Back"}
+              {mode === "signup"
+                ? "Get Started with Us"
+                : "Welcome Back"}
             </h1>
 
             {/* Supporting paragraph also changes depending on mode */}
@@ -170,20 +243,38 @@ export default function AuthPage() {
 
             {/* Step cards shown on left side */}
             <div className="auth-steps">
-              <div className={`step-card ${mode === "signup" ? "active" : ""}`}>
+
+              <div
+                className={`step-card ${
+                  mode === "signup" ? "active" : ""
+                }`}
+              >
                 <span>1</span>
-                <p>{mode === "signup" ? "Sign up your account" : "Log into account"}</p>
+                <p>
+                  {mode === "signup"
+                    ? "Sign up your account"
+                    : "Log into account"}
+                </p>
               </div>
 
               <div className="step-card">
                 <span>2</span>
-                <p>{mode === "signup" ? "Set up your role" : "Access dashboard"}</p>
+                <p>
+                  {mode === "signup"
+                    ? "Set up your role"
+                    : "Access dashboard"}
+                </p>
               </div>
 
               <div className="step-card">
                 <span>3</span>
-                <p>{mode === "signup" ? "Set up your profile" : "Manage events"}</p>
+                <p>
+                  {mode === "signup"
+                    ? "Set up your profile"
+                    : "Manage events"}
+                </p>
               </div>
+
             </div>
           </div>
         </div>
@@ -191,11 +282,48 @@ export default function AuthPage() {
         {/* Right side form panel */}
         <div className="auth-right">
           <div className="auth-form-wrap">
+
             {/* Toggle buttons to switch between login and sign up */}
-           
+            <div className="auth-toggle">
+
+              <button
+                className={mode === "login" ? "active" : ""}
+                onClick={() => {
+                  // Switch to login form
+                  setMode("login");
+
+                  // Clear messages when switching form
+                  setError("");
+                  setMessage("");
+                }}
+                type="button"
+              >
+                Login
+              </button>
+
+              <button
+                className={mode === "signup" ? "active" : ""}
+                onClick={() => {
+                  // Switch to signup form
+                  setMode("signup");
+
+                  // Clear messages when switching form
+                  setError("");
+                  setMessage("");
+                }}
+                type="button"
+              >
+                Sign Up
+              </button>
+
+            </div>
 
             {/* Form heading changes with mode */}
-            <h2>{mode === "signup" ? "Sign Up Account" : "Login Account"}</h2>
+            <h2>
+              {mode === "signup"
+                ? "Sign Up Account"
+                : "Login Account"}
+            </h2>
 
             {/* Form subtext changes with mode */}
             <p className="form-subtext">
@@ -204,23 +332,18 @@ export default function AuthPage() {
                 : "Enter your credentials to access your account."}
             </p>
 
-            {/* Social auth buttons - UI only for now */}
-            <div className="social-buttons">
-              <button type="button">G Google</button>
-              <button type="button">◉ GitHub</button>
-            </div>
-
-            {/* Divider between social login and form */}
-            <div className="divider">
-              <span>Or</span>
-            </div>
-
             {/* If mode is signup, show sign up form */}
             {mode === "signup" ? (
-              <form className="auth-form" onSubmit={handleSignupSubmit}>
+
+              <form
+                className="auth-form"
+                onSubmit={handleSignupSubmit}
+                noValidate
+              >
 
                 {/* First name + last name row */}
                 <div className="row-two">
+
                   <label>
                     First Name
                     <input
@@ -229,7 +352,6 @@ export default function AuthPage() {
                       placeholder="eg. John"
                       value={signupForm.firstName}
                       onChange={handleSignupChange}
-                      required
                     />
                   </label>
 
@@ -241,9 +363,9 @@ export default function AuthPage() {
                       placeholder="eg. Smith"
                       value={signupForm.lastName}
                       onChange={handleSignupChange}
-                      required
                     />
                   </label>
+
                 </div>
 
                 {/* Email field */}
@@ -255,7 +377,18 @@ export default function AuthPage() {
                     placeholder="eg. john@email.com"
                     value={signupForm.email}
                     onChange={handleSignupChange}
-                    required
+                  />
+                </label>
+
+                {/* Confirm email field */}
+                <label>
+                  Confirm Email
+                  <input
+                    type="email"
+                    name="confirmEmail"
+                    placeholder="Re-enter your email"
+                    value={signupForm.confirmEmail}
+                    onChange={handleSignupChange}
                   />
                 </label>
 
@@ -267,46 +400,72 @@ export default function AuthPage() {
                     value={signupForm.role}
                     onChange={handleSignupChange}
                   >
-                    <option value="attendee">Attendee</option>
-                    <option value="organizer">Organizer</option>
+                    <option value="attendee">
+                      Attendee
+                    </option>
+
+                    <option value="organizer">
+                      Organizer
+                    </option>
                   </select>
                 </label>
 
                 {/* Password field */}
-                <div style={{ position: "relative" }}>
-  <input
-    type={showPassword ? "text" : "password"}
-    name="password"
-    placeholder="Enter your password"
-    value={signupForm.password}
-    onChange={handleSignupChange}
-    required
-  />
-  <span
-    onClick={() => setShowPassword(!showPassword)}
-    style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#aaa" }}
-  >
-    {showPassword ? "🙈" : "😒"}
-  </span>
-</div>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    value={signupForm.password}
+                    onChange={handleSignupChange}
+                  />
+                </label>
 
-                {/* Small helper note under password */}
-                <p className="helper-text">Must be at least 8 characters.</p>
+                {/* Confirm password field */}
+                <label>
+                  Confirm Password
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="Re-enter your password"
+                    value={signupForm.confirmPassword}
+                    onChange={handleSignupChange}
+                  />
+                </label>
 
                 {/* Show error if present */}
-                {error && <p className="form-error">{error}</p>}
+                {error && (
+                  <p className="form-error">
+                    {error}
+                  </p>
+                )}
 
                 {/* Show success message if present */}
-                {message && <p className="form-success">{message}</p>}
+                {message && (
+                  <p className="form-success">
+                    {message}
+                  </p>
+                )}
 
                 {/* Submit button */}
-                <button className="submit-btn" type="submit">
+                <button
+                  className="submit-btn"
+                  type="submit"
+                >
                   Sign Up
                 </button>
+
               </form>
+
             ) : (
+
               // Otherwise show login form
-              <form className="auth-form" onSubmit={handleLoginSubmit}>
+              <form
+                className="auth-form"
+                onSubmit={handleLoginSubmit}
+                noValidate
+              >
 
                 {/* Email field */}
                 <label>
@@ -317,66 +476,92 @@ export default function AuthPage() {
                     placeholder="Enter your email"
                     value={loginForm.email}
                     onChange={handleLoginChange}
-                    required
                   />
                 </label>
 
                 {/* Password field */}
-               {/* Password field */}
-<label>Password</label>
-<div style={{ position: "relative" }}>
-  <input
-    type={showPassword ? "text" : "password"}
-    name="password"
-    placeholder="Enter your password"
-    value={loginForm.password}
-    onChange={handleLoginChange}
-    required
-  />
-  <span
-    onClick={() => setShowPassword(!showPassword)}
-    style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#aaa" }}
-  >
-    {showPassword ? "🙈" : "👁"}
-  </span>
-</div>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    value={loginForm.password}
+                    onChange={handleLoginChange}
+                  />
+                </label>
 
                 {/* Show error if present */}
-                {error && <p className="form-error">{error}</p>}
+                {error && (
+                  <p className="form-error">
+                    {error}
+                  </p>
+                )}
 
                 {/* Show success message if present */}
-                {message && <p className="form-success">{message}</p>}
+                {message && (
+                  <p className="form-success">
+                    {message}
+                  </p>
+                )}
 
                 {/* Submit button */}
-                <button className="submit-btn" type="submit">
+                <button
+                  className="submit-btn"
+                  type="submit"
+                >
                   Login
                 </button>
+
               </form>
+
             )}
 
             {/* Bottom text to switch between login and signup */}
             <p className="bottom-switch">
+
               {mode === "signup" ? (
+
                 <>
                   Already have an account?{" "}
-                  <button type="button" onClick={() => setMode("login")}>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("login");
+                      setError("");
+                      setMessage("");
+                    }}
+                  >
                     Log in
                   </button>
                 </>
+
               ) : (
+
                 <>
                   Don’t have an account?{" "}
-                  <button type="button" onClick={() => setMode("signup")}>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("signup");
+                      setError("");
+                      setMessage("");
+                    }}
+                  >
                     Sign up
                   </button>
                 </>
+
               )}
+
             </p>
+
           </div>
         </div>
+
       </div>
     </div>
   );
 }
-
-
