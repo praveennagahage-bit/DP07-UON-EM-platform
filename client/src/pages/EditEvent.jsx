@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-function CreateEvent() {
+function EditEvent() {
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -10,7 +11,7 @@ function CreateEvent() {
     date: "",
     time: "",
     location: "",
-    category: "Workshop",
+    category: "",
     capacity: "",
   });
 
@@ -28,6 +29,37 @@ function CreateEvent() {
     console.error(err);
   }
 
+  useEffect(() => {
+    async function fetchEvent() {
+      try {
+        const response = await fetch(
+          `http://localhost:3000/events/${id}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Event not found");
+        }
+
+        const data = await response.json();
+
+        setForm({
+          title: data.title || "",
+          description: data.description || "",
+          date: data.date || "",
+          time: data.time || "",
+          location: data.location || "",
+          category: data.category || "",
+          capacity: data.capacity || "",
+        });
+      } catch (err) {
+        console.error(err);
+        setError("Could not load event");
+      }
+    }
+
+    fetchEvent();
+  }, [id]);
+
   function handleChange(e) {
     const { name, value } = e.target;
 
@@ -40,35 +72,22 @@ function CreateEvent() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    setError("");
-
     if (!currentUser || currentUser.role !== "organizer") {
-      setError("Only organizers can create events");
-      return;
-    }
-
-    if (
-      !form.title ||
-      !form.date ||
-      !form.time ||
-      !form.location
-    ) {
-      setError("Please complete all required fields");
+      setError("Only organizers can edit events");
       return;
     }
 
     try {
       const response = await fetch(
-        "http://localhost:3000/events",
+        `http://localhost:3000/events/${id}`,
         {
-          method: "POST",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             ...form,
             capacity: Number(form.capacity),
-            createdBy: currentUser.id,
           }),
         }
       );
@@ -76,7 +95,7 @@ function CreateEvent() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Failed to create event");
+        setError(data.message || "Failed to update event");
         return;
       }
 
@@ -98,10 +117,6 @@ function CreateEvent() {
         }}
       >
         <h2>Organizer access required</h2>
-
-        <button onClick={() => navigate("/events")}>
-          Back to Events
-        </button>
       </div>
     );
   }
@@ -128,14 +143,14 @@ function CreateEvent() {
         <p
           style={{
             color: "#7fb7aa",
-            textTransform: "uppercase",
             fontSize: "13px",
+            textTransform: "uppercase",
           }}
         >
           Organizer
         </p>
 
-        <h1>Create Event</h1>
+        <h1>Edit Event</h1>
 
         <form
           onSubmit={handleSubmit}
@@ -147,42 +162,44 @@ function CreateEvent() {
         >
           <input
             name="title"
-            placeholder="Event title"
             value={form.title}
             onChange={handleChange}
+            placeholder="Event title"
             style={inputStyle}
           />
 
           <textarea
             name="description"
-            placeholder="Event description"
             value={form.description}
             onChange={handleChange}
             rows="4"
+            placeholder="Description"
             style={inputStyle}
           />
 
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            style={inputStyle}
-          />
+                <input
+        type="date"
+        name="date"
+        value={form.date}
+        onChange={handleChange}
+        className="dark-date-time"
+        style={inputStyle}
+        />
 
-          <input
-            type="time"
-            name="time"
-            value={form.time}
-            onChange={handleChange}
-            style={inputStyle}
-          />
+        <input
+        type="time"
+        name="time"
+        value={form.time}
+        onChange={handleChange}
+        className="dark-date-time"
+        style={inputStyle}
+        />
 
           <input
             name="location"
-            placeholder="Location"
             value={form.location}
             onChange={handleChange}
+            placeholder="Location"
             style={inputStyle}
           />
 
@@ -201,9 +218,9 @@ function CreateEvent() {
           <input
             type="number"
             name="capacity"
-            placeholder="Capacity"
             value={form.capacity}
             onChange={handleChange}
+            placeholder="Capacity"
             style={inputStyle}
           />
 
@@ -213,20 +230,44 @@ function CreateEvent() {
             </p>
           )}
 
-          <button
-            type="submit"
+          <div
             style={{
-              padding: "12px",
-              background: "#065f52",
-              color: "white",
-              border: "1px solid #087565",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "600",
+              display: "flex",
+              gap: "10px",
             }}
           >
-            Create Event
-          </button>
+            <button
+              type="button"
+              onClick={() => navigate("/events")}
+              style={{
+                flex: 1,
+                padding: "12px",
+                background: "#ffffff",
+                color: "#111111",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              style={{
+                flex: 1,
+                padding: "12px",
+                background: "#065f52",
+                color: "#ffffff",
+                border: "1px solid #087565",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "600",
+              }}
+            >
+              Save Changes
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -242,4 +283,4 @@ const inputStyle = {
   fontFamily: "inherit",
 };
 
-export default CreateEvent;
+export default EditEvent;

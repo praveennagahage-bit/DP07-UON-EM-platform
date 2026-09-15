@@ -29,3 +29,21 @@ button:hover {
 button:active {
   transform: translateY(1px);
 }
+
+.dark-date-time {
+  color-scheme: dark;
+  background-color: #171717;
+  color: #ffffff;
+}
+
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2) contrast(1.5);
+  opacity: 1;
+  cursor: pointer;
+}

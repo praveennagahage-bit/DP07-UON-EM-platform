@@ -5,8 +5,26 @@ function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🔥 TEMP login state (we will make dynamic later)
-  const isLoggedIn = false;
+  // Get current logged-in user from localStorage
+  let currentUser = null;
+
+  try {
+    const storedUser = localStorage.getItem("uonUser");
+
+    if (storedUser) {
+      currentUser = JSON.parse(storedUser);
+    }
+  } catch (error) {
+    console.error("Failed to read user information:", error);
+  }
+
+  const isLoggedIn = currentUser !== null;
+
+  // Handle user logout
+  function handleLogout() {
+    localStorage.removeItem("uonUser");
+    navigate("/auth");
+  }
 
   const linkStyle = (path) => ({
     marginRight: "20px",
@@ -14,9 +32,11 @@ function Navbar() {
     fontWeight: "500",
     color: location.pathname === path ? "#065f52" : "#333",
     borderBottom:
-      location.pathname === path ? "2px solid #065f52" : "2px solid transparent",
+      location.pathname === path
+        ? "2px solid #065f52"
+        : "2px solid transparent",
     paddingBottom: "4px",
-    transition: "0.2s ease"
+    transition: "0.2s ease",
   });
 
   return (
@@ -27,7 +47,7 @@ function Navbar() {
         justifyContent: "space-between",
         padding: "14px 40px",
         background: "#ffffff",
-        borderBottom: "1px solid #e5e5e5"
+        borderBottom: "1px solid #e5e5e5",
       }}
     >
       {/* LEFT: LOGO */}
@@ -35,7 +55,7 @@ function Navbar() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "10px"
+          gap: "10px",
         }}
       >
         {/* LOGO */}
@@ -45,7 +65,7 @@ function Navbar() {
           style={{
             width: "40px",
             height: "40px",
-            objectFit: "contain"
+            objectFit: "contain",
           }}
         />
 
@@ -55,7 +75,7 @@ function Navbar() {
             style={{
               fontWeight: "bold",
               fontSize: "16px",
-              color: "#111111"
+              color: "#111111",
             }}
           >
             University of Newcastle
@@ -64,7 +84,7 @@ function Navbar() {
           <div
             style={{
               fontSize: "12px",
-              color: "#666666"
+              color: "#666666",
             }}
           >
             Event Management Platform
@@ -92,7 +112,7 @@ function Navbar() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "15px"
+          gap: "15px",
         }}
       >
         {/* SEARCH */}
@@ -105,7 +125,7 @@ function Navbar() {
             border: "1px solid #cccccc",
             background: "#ffffff",
             color: "#111111",
-            outline: "none"
+            outline: "none",
           }}
         />
 
@@ -113,7 +133,7 @@ function Navbar() {
         <span
           style={{
             fontSize: "18px",
-            cursor: "pointer"
+            cursor: "pointer",
           }}
         >
           🔔
@@ -125,44 +145,67 @@ function Navbar() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px"
+              gap: "12px",
             }}
           >
+            {/* USER AVATAR */}
             <div
               style={{
-                width: "35px",
-                height: "35px",
+                width: "38px",
+                height: "38px",
                 borderRadius: "50%",
                 background: "#065f52",
-                color: "white",
+                color: "#ffffff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: "bold"
+                fontWeight: "bold",
+                fontSize: "14px",
               }}
             >
-              JD
+              {currentUser.firstName?.charAt(0).toUpperCase()}
+              {currentUser.lastName?.charAt(0).toUpperCase()}
             </div>
 
+            {/* USER INFORMATION */}
             <div>
               <div
                 style={{
                   fontSize: "14px",
-                  color: "#111111"
+                  fontWeight: "600",
+                  color: "#111111",
                 }}
               >
-                John Doe
+                {currentUser.firstName} {currentUser.lastName}
               </div>
 
               <div
                 style={{
                   fontSize: "12px",
-                  color: "#666666"
+                  color: "#666666",
+                  textTransform: "capitalize",
                 }}
               >
-                Student
+                {currentUser.role}
               </div>
             </div>
+
+            {/* LOGOUT BUTTON */}
+            <button
+              onClick={handleLogout}
+              style={{
+                marginLeft: "5px",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "1px solid #065f52",
+                background: "#ffffff",
+                color: "#065f52",
+                cursor: "pointer",
+                fontWeight: "600",
+              }}
+            >
+              Logout
+            </button>
           </div>
         ) : (
           <button
@@ -174,7 +217,7 @@ function Navbar() {
               background: "#065f52",
               color: "#ffffff",
               border: "1px solid #065f52",
-              fontWeight: "600"
+              fontWeight: "600",
             }}
           >
             Sign In / Sign Up

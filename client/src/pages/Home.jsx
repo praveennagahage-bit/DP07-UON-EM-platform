@@ -1,28 +1,59 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
 
-  const events = [
-    {
-      id: 1,
-      title: "AI Workshop",
-      date: "20 Apr 2026",
-      venue: "UoN Campus",
-    },
-    {
-      id: 2,
-      title: "Tech Meetup",
-      date: "10 Jun 2026",
-      venue: "City Hall",
-    },
-    {
-      id: 3,
-      title: "Hackathon",
-      date: "01 Jul 2026",
-      venue: "Innovation Hub",
-    },
-  ];
+  const [allEvents, setAllEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [eventError, setEventError] = useState("");
+
+  // Load events from the backend
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        setLoading(true);
+        setEventError("");
+
+        const response = await fetch("http://localhost:3000/events");
+
+        if (!response.ok) {
+          throw new Error("Failed to load events");
+        }
+
+        const data = await response.json();
+
+        setAllEvents(data);
+      } catch (error) {
+        console.error("Could not load homepage events:", error);
+        setEventError("Could not load upcoming events");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEvents();
+  }, []);
+
+  // Only show the first 3 events on the homepage
+  const upcomingEvents = allEvents.slice(0, 3);
+
+  // Dynamic category counts
+  const workshopCount = allEvents.filter(
+    (event) => event.category === "Workshop"
+  ).length;
+
+  const seminarCount = allEvents.filter(
+    (event) => event.category === "Seminar"
+  ).length;
+
+  const socialCount = allEvents.filter(
+    (event) => event.category === "Social"
+  ).length;
+
+  const sportsCount = allEvents.filter(
+    (event) => event.category === "Sports"
+  ).length;
 
   const itemStyle = {
     padding: "12px 14px",
@@ -186,6 +217,46 @@ function Home() {
             </h2>
           </div>
 
+          {/* LOADING */}
+          {loading && (
+            <p
+              style={{
+                color: "#aaaaaa",
+              }}
+            >
+              Loading events...
+            </p>
+          )}
+
+          {/* ERROR */}
+          {eventError && (
+            <p
+              style={{
+                color: "#ff7070",
+              }}
+            >
+              {eventError}
+            </p>
+          )}
+
+          {/* NO EVENTS */}
+          {!loading &&
+            !eventError &&
+            upcomingEvents.length === 0 && (
+              <div
+                style={{
+                  background: "#0b0b0b",
+                  border: "1px solid #292929",
+                  padding: "25px",
+                  borderRadius: "8px",
+                  color: "#aaaaaa",
+                }}
+              >
+                No upcoming events are currently available.
+              </div>
+            )}
+
+          {/* EVENT CARDS */}
           <div
             style={{
               display: "flex",
@@ -193,7 +264,7 @@ function Home() {
               flexWrap: "wrap",
             }}
           >
-            {events.map((event) => (
+            {upcomingEvents.map((event) => (
               <div
                 key={event.id}
                 style={{
@@ -204,9 +275,9 @@ function Home() {
                   border: "1px solid #292929",
                 }}
               >
-                {/* IMAGE */}
+                {/* EVENT IMAGE */}
                 <img
-                  src="https://picsum.photos/300/150"
+                  src={`https://picsum.photos/300/150?random=${event.id}`}
                   alt={event.title}
                   style={{
                     width: "100%",
@@ -218,6 +289,20 @@ function Home() {
                 />
 
                 <div style={{ padding: "18px" }}>
+                  {/* CATEGORY */}
+                  <p
+                    style={{
+                      margin: "0 0 7px",
+                      color: "#7fb7aa",
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {event.category || "Event"}
+                  </p>
+
+                  {/* TITLE */}
                   <h3
                     style={{
                       margin: "0 0 15px",
@@ -228,6 +313,7 @@ function Home() {
                     {event.title}
                   </h3>
 
+                  {/* DATE */}
                   <p
                     style={{
                       margin: "6px 0",
@@ -235,9 +321,10 @@ function Home() {
                       fontSize: "14px",
                     }}
                   >
-                    {event.date}
+                    📅 {event.date}
                   </p>
 
+                  {/* TIME */}
                   <p
                     style={{
                       margin: "6px 0",
@@ -245,11 +332,25 @@ function Home() {
                       fontSize: "14px",
                     }}
                   >
-                    {event.venue}
+                    ⏰ {event.time}
                   </p>
 
+                  {/* LOCATION */}
+                  <p
+                    style={{
+                      margin: "6px 0",
+                      color: "#bdbdbd",
+                      fontSize: "14px",
+                    }}
+                  >
+                    📍 {event.location}
+                  </p>
+
+                  {/* VIEW DETAILS */}
                   <button
-                    onClick={() => navigate(`/events/${event.id}`)}
+                    onClick={() =>
+                      navigate(`/events/${event.id}`)
+                    }
                     style={{
                       marginTop: "16px",
                       padding: "10px",
@@ -357,23 +458,28 @@ function Home() {
               }}
             >
               <div style={activeCategory}>
-                All Events <span>24</span>
+                All Events
+                <span>{allEvents.length}</span>
               </div>
 
               <div style={categoryItem}>
-                Workshops <span>8</span>
+                Workshops
+                <span>{workshopCount}</span>
               </div>
 
               <div style={categoryItem}>
-                Seminars <span>6</span>
+                Seminars
+                <span>{seminarCount}</span>
               </div>
 
               <div style={categoryItem}>
-                Social <span>7</span>
+                Social
+                <span>{socialCount}</span>
               </div>
 
               <div style={categoryItem}>
-                Sports <span>3</span>
+                Sports
+                <span>{sportsCount}</span>
               </div>
             </div>
           </div>
