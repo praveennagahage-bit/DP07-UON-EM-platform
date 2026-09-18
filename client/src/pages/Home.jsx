@@ -1,8 +1,12 @@
+import defaultEventImage from '../assets/hero.png';
+import { apiFetch } from "../api";
+import { useAuth } from "../auth/AuthContext";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +19,7 @@ function Home() {
         setLoading(true);
         setEventError("");
 
-        const response = await fetch("http://localhost:3000/events");
+        const response = await apiFetch("/events");
 
         if (!response.ok) {
           throw new Error("Failed to load events");
@@ -23,7 +27,7 @@ function Home() {
 
         const data = await response.json();
 
-        setAllEvents(data);
+        setAllEvents(data.filter(event => event.status === "active"));
       } catch (error) {
         console.error("Could not load homepage events:", error);
         setEventError("Could not load upcoming events");
@@ -277,7 +281,7 @@ function Home() {
               >
                 {/* EVENT IMAGE */}
                 <img
-                  src={`https://picsum.photos/300/150?random=${event.id}`}
+                  src={event.imageUrl || defaultEventImage}
                   alt={event.title}
                   style={{
                     width: "100%",
@@ -409,16 +413,14 @@ function Home() {
                 gap: "10px",
               }}
             >
-              <div
+              {user?.role === "organizer" && <button
                 style={itemStyle}
                 onClick={() => navigate("/create")}
               >
                 Create New Event →
-              </div>
+              </button>}
 
-              <div style={itemStyle}>
-                My Bookings →
-              </div>
+              {user?.role === "attendee" && <button style={itemStyle} onClick={() => navigate("/bookings")}>My Bookings →</button>}
 
               <div style={itemStyle}>
                 Update Profile →
