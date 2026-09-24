@@ -1,3 +1,7 @@
+import EventSearch from "./EventSearch";
+import NotificationBell from "./NotificationBell";
+import { useState } from "react";
+import { useAuth } from "../auth/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/unilogo.jpg";
 
@@ -5,25 +9,15 @@ function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Get current logged-in user from localStorage
-  let currentUser = null;
-
-  try {
-    const storedUser = localStorage.getItem("uonUser");
-
-    if (storedUser) {
-      currentUser = JSON.parse(storedUser);
-    }
-  } catch (error) {
-    console.error("Failed to read user information:", error);
-  }
-
+  const { user: currentUser, logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const isLoggedIn = currentUser !== null;
-
-  // Handle user logout
-  function handleLogout() {
-    localStorage.removeItem("uonUser");
-    navigate("/auth");
+  async function handleLogout() {
+    setBusy(true); setError('');
+    try { await logout(); navigate('/auth'); }
+    catch (err) { setError(err.message || 'Could not log out'); }
+    finally { setBusy(false); }
   }
 
   const linkStyle = (path) => ({
@@ -41,6 +35,7 @@ function Navbar() {
 
   return (
     <nav
+      className="navbar"
       style={{
         display: "flex",
         alignItems: "center",
@@ -102,11 +97,11 @@ function Navbar() {
           Events
         </Link>
 
-        <Link to="/create" style={linkStyle("/create")}>
-          Create
-        </Link>
+        {currentUser?.role === "organizer" && <Link to="/create" style={linkStyle("/create")}>Create</Link>}
+        {currentUser?.role === "attendee" && <Link to="/bookings" style={linkStyle("/bookings")}>My Bookings</Link>}
       </div>
 
+      {error && <p role="alert" className="error">{error}</p>}
       {/* RIGHT SIDE */}
       <div
         style={{
@@ -115,29 +110,8 @@ function Navbar() {
           gap: "15px",
         }}
       >
-        {/* SEARCH */}
-        <input
-          type="text"
-          placeholder="Search events..."
-          style={{
-            padding: "8px 10px",
-            borderRadius: "6px",
-            border: "1px solid #cccccc",
-            background: "#ffffff",
-            color: "#111111",
-            outline: "none",
-          }}
-        />
-
-        {/* NOTIFICATION */}
-        <span
-          style={{
-            fontSize: "18px",
-            cursor: "pointer",
-          }}
-        >
-          🔔
-        </span>
+        <EventSearch key={location.pathname + location.search} initialQuery={location.pathname === '/events' ? new URLSearchParams(location.search).get('q') || '' : ''} />
+        <NotificationBell />
 
         {/* PROFILE / AUTH */}
         {isLoggedIn ? (
@@ -193,6 +167,7 @@ function Navbar() {
             {/* LOGOUT BUTTON */}
             <button
               onClick={handleLogout}
+              disabled={busy}
               style={{
                 marginLeft: "5px",
                 padding: "8px 12px",

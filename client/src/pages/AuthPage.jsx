@@ -1,6 +1,8 @@
+import { useAuth } from "../auth/AuthContext";
+import { apiFetch } from "../api";
 // Import React's useState hook to store and update component state
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 // Import the CSS file that styles this auth page
 import "./auth.css";
@@ -9,11 +11,14 @@ import "./auth.css";
 // This page contains BOTH Sign Up and Login in one screen
 export default function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  const [busy, setBusy] = useState(false);
 
   // mode decides which form is visible:
   // "signup" -> Sign Up form
   // "login"  -> Login form
-  const [mode, setMode] = useState("signup");
+  const [mode, setMode] = useState("login");
 
   // Stores login form input values
   const [loginForm, setLoginForm] = useState({
@@ -66,6 +71,7 @@ export default function AuthPage() {
   async function handleLoginSubmit(e) {
     // Prevent the browser from refreshing the page
     e.preventDefault();
+    if (busy) return;
 
     // Clear old messages before new request
     setError("");
@@ -83,46 +89,21 @@ export default function AuthPage() {
       return;
     }
 
+    setBusy(true);
     try {
-      // Send login data to backend
-      const response = await fetch("http://localhost:3000/login", {
-        method: "POST",
-        headers: {
-          // Tell backend we are sending JSON
-          "Content-Type": "application/json",
-        },
-
-        // Send the login form object as JSON
-        body: JSON.stringify(loginForm),
-      });
-
-      // Convert backend response into JavaScript object
-      const data = await response.json();
-
-      // If backend returns an error status, show error message
-      if (!response.ok) {
-        setError(data.message || "Login failed");
-        return;
-      }
-
-      // If successful, show success message
-      setMessage("Login successful");
-
-      // Save logged-in user information
-      localStorage.setItem("uonUser", JSON.stringify(data.user));
-
-      // Redirect to Home page after successful login
-      navigate("/");
+      await login(loginForm);
+      const destination = location.state?.from;
+      navigate(typeof destination === 'string' && destination.startsWith('/') && !destination.startsWith('//') ? destination : '/');
     } catch (err) {
-      // If request fails completely (server down, network issue, etc.)
-      setError("Could not connect to server");
-    }
+      setError(err.message || 'Could not connect to server');
+    } finally { setBusy(false); }
   }
 
   // Handles sign up form submission
   async function handleSignupSubmit(e) {
     // Prevent page refresh
     e.preventDefault();
+    if (busy) return;
 
     // Clear old messages
     setError("");
@@ -179,13 +160,14 @@ export default function AuthPage() {
       return;
     }
 
+    setBusy(true);
     try {
       // Backend now supports:
       // firstName, lastName, email, role, and password
       //
       // Social buttons are currently UI-only and are not sent to backend.
 
-      const response = await fetch("http://localhost:3000/register", {
+      const response = await apiFetch("/register", {
         method: "POST",
         headers: {
           // Tell backend the request body is JSON
@@ -211,11 +193,14 @@ export default function AuthPage() {
       }
 
       // If successful, show success message
-      setMessage("Account created successfully");
+      setMessage("Account created successfully. Please log in.");
+      setLoginForm({ email: signupForm.email.trim(), password: "" });
+      setSignupForm(previous => ({ ...previous, password: "", confirmPassword: "" }));
+      setMode("login");
     } catch (err) {
       // If request fails completely
-      setError("Could not connect to server");
-    }
+      setError(err.message || "Could not connect to server");
+    } finally { setBusy(false); }
   }
 
   // UI rendered by the component
@@ -436,14 +421,14 @@ export default function AuthPage() {
 
                 {/* Show error if present */}
                 {error && (
-                  <p className="form-error">
+                  <p className="form-error" role="alert">
                     {error}
                   </p>
                 )}
 
                 {/* Show success message if present */}
                 {message && (
-                  <p className="form-success">
+                  <p className="form-success" role="status">
                     {message}
                   </p>
                 )}
@@ -451,6 +436,7 @@ export default function AuthPage() {
                 {/* Submit button */}
                 <button
                   className="submit-btn"
+                  disabled={busy}
                   type="submit"
                 >
                   Sign Up
@@ -493,14 +479,14 @@ export default function AuthPage() {
 
                 {/* Show error if present */}
                 {error && (
-                  <p className="form-error">
+                  <p className="form-error" role="alert">
                     {error}
                   </p>
                 )}
 
                 {/* Show success message if present */}
                 {message && (
-                  <p className="form-success">
+                  <p className="form-success" role="status">
                     {message}
                   </p>
                 )}
@@ -508,6 +494,7 @@ export default function AuthPage() {
                 {/* Submit button */}
                 <button
                   className="submit-btn"
+                  disabled={busy}
                   type="submit"
                 >
                   Login
