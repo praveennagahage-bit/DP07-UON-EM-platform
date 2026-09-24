@@ -1,13 +1,12 @@
+import QuickActions from "../components/QuickActions";
 import FeaturedEvent from "../components/FeaturedEvent";
 import defaultEventImage from "../assets/hero.png";
 import { apiFetch } from "../api";
-import { useAuth } from "../auth/AuthContext";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   // Search
   const [search, setSearch] = useState("");
@@ -78,16 +77,6 @@ function Home() {
   ).length;
 
   // Reusable styles
-  const itemStyle = {
-    padding: "12px 14px",
-    borderRadius: "6px",
-    background: "#171717",
-    border: "1px solid #2b2b2b",
-    color: "#f5f5f5",
-    cursor: "pointer",
-    transition: "0.2s ease",
-  };
-
   const categoryItem = {
     display: "flex",
     justifyContent: "space-between",
@@ -140,7 +129,6 @@ function Home() {
         ====================================================== */}
 
         <div style={{ flex: 3, minWidth: 0 }}>
-
           {/* =====================================================
               HERO SECTION
           ====================================================== */}
@@ -161,6 +149,7 @@ function Home() {
               }}
             >
               {/* SMALL HEADING */}
+
               <p
                 style={{
                   margin: "0 0 10px",
@@ -175,6 +164,7 @@ function Home() {
               </p>
 
               {/* MAIN HEADING */}
+
               <h1
                 style={{
                   margin: 0,
@@ -196,6 +186,7 @@ function Home() {
               </h1>
 
               {/* HERO DESCRIPTION */}
+
               <p
                 style={{
                   marginTop: "16px",
@@ -225,6 +216,7 @@ function Home() {
                 }}
               >
                 {/* SEARCH INPUT */}
+
                 <div
                   style={{
                     position: "relative",
@@ -232,6 +224,7 @@ function Home() {
                   }}
                 >
                   {/* SEARCH ICON */}
+
                   <span
                     style={{
                       position: "absolute",
@@ -256,21 +249,14 @@ function Home() {
                       boxSizing: "border-box",
                       width: "100%",
                       height: "56px",
-
                       padding: "0 20px 0 50px",
-
                       background: "rgba(8, 29, 27, 0.90)",
                       color: "#ffffff",
-
                       border:
                         "1px solid rgba(255, 255, 255, 0.22)",
-
                       borderRadius: "9px",
-
                       fontSize: "15px",
-
                       outline: "none",
-
                       boxShadow:
                         "0 6px 20px rgba(0, 0, 0, 0.12)",
                     }}
@@ -278,32 +264,24 @@ function Home() {
                 </div>
 
                 {/* SEARCH BUTTON */}
+
                 <button
                   type="submit"
                   style={{
                     height: "56px",
-
                     padding: "0 26px",
-
                     background: "#20dbaa",
                     color: "#03231b",
-
                     border: "none",
                     borderRadius: "9px",
-
                     cursor: "pointer",
-
                     fontSize: "14px",
                     fontWeight: "700",
-
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-
                     gap: "9px",
-
                     whiteSpace: "nowrap",
-
                     boxShadow:
                       "0 7px 20px rgba(32, 219, 170, 0.16)",
                   }}
@@ -333,6 +311,7 @@ function Home() {
                 }}
               >
                 {/* WORKSHOPS */}
+
                 <div
                   onClick={() =>
                     navigate("/events?category=Workshop")
@@ -369,6 +348,7 @@ function Home() {
                 </div>
 
                 {/* SEMINARS */}
+
                 <div
                   onClick={() =>
                     navigate("/events?category=Seminar")
@@ -405,6 +385,7 @@ function Home() {
                 </div>
 
                 {/* SOCIAL */}
+
                 <div
                   onClick={() =>
                     navigate("/events?category=Social")
@@ -441,6 +422,7 @@ function Home() {
                 </div>
 
                 {/* SPORTS */}
+
                 <div
                   onClick={() =>
                     navigate("/events?category=Sports")
@@ -478,42 +460,44 @@ function Home() {
               </div>
             </div>
           </div>
-           {/* =====================================================
-    FEATURED EVENT SECTION
-====================================================== */}
 
-<div
-  style={{
-    marginTop: "38px",
-    marginBottom: "18px",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      fontSize: "22px",
-      fontWeight: "650",
-      display: "flex",
-      alignItems: "center",
-      gap: "9px",
-    }}
-  >
-    <span
-      style={{
-        color: "#35e6b5",
-        fontSize: "22px",
-      }}
-    >
-      ★
-    </span>
+          {/* =====================================================
+              FEATURED EVENT SECTION
+          ====================================================== */}
 
-    Featured Event
-  </h2>
-</div>
+          <div
+            style={{
+              marginTop: "38px",
+              marginBottom: "18px",
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "22px",
+                fontWeight: "650",
+                display: "flex",
+                alignItems: "center",
+                gap: "9px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#35e6b5",
+                  fontSize: "22px",
+                }}
+              >
+                ★
+              </span>
 
-{/* Featured event card goes here */}
-<FeaturedEvent />
-           
+              Featured Event
+            </h2>
+          </div>
+
+          {/* Featured event card */}
+
+          <FeaturedEvent />
+
           {/* =====================================================
               EVENTS HEADING
           ====================================================== */}
@@ -707,21 +691,13 @@ function Home() {
                     }
                     style={{
                       marginTop: "16px",
-
                       padding: "10px",
-
                       width: "100%",
-
                       background: "#064e43",
-
                       color: "white",
-
                       border: "1px solid #0b6255",
-
                       borderRadius: "6px",
-
                       cursor: "pointer",
-
                       fontWeight: "600",
                     }}
                   >
@@ -747,64 +723,11 @@ function Home() {
               QUICK ACTIONS
           ====================================================== */}
 
-          <div style={sidebarCardStyle}>
-            <p
-              style={{
-                margin: "0 0 6px",
-                color: "#7fb7aa",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "1.1px",
-                fontWeight: "600",
-              }}
-            >
-              Shortcuts
-            </p>
-
-            <h3
-              style={{
-                margin: "0 0 18px",
-                color: "#ffffff",
-              }}
-            >
-              Quick Actions
-            </h3>
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}
-            >
-              {/* ORGANIZER */}
-
-              {user?.role === "organizer" && (
-                <button
-                  style={itemStyle}
-                  onClick={() => navigate("/create")}
-                >
-                  Create New Event →
-                </button>
-              )}
-
-              {/* ATTENDEE */}
-
-              {user?.role === "attendee" && (
-                <button
-                  style={itemStyle}
-                  onClick={() => navigate("/bookings")}
-                >
-                  My Bookings →
-                </button>
-              )}
-
-              {/* PROFILE */}
-
-              <div style={itemStyle}>
-                Update Profile →
-              </div>
-            </div>
+          <div
+          className="sidebar"
+          style={{ marginBottom: "20px" }}
+          >
+            <QuickActions />
           </div>
 
           {/* =====================================================
@@ -964,19 +887,12 @@ function Home() {
               placeholder="Enter your email"
               style={{
                 boxSizing: "border-box",
-
                 width: "100%",
-
                 padding: "11px",
-
                 background: "#171717",
-
                 color: "#ffffff",
-
                 borderRadius: "6px",
-
                 border: "1px solid #343434",
-
                 outline: "none",
               }}
             />
@@ -984,21 +900,13 @@ function Home() {
             <button
               style={{
                 marginTop: "10px",
-
                 width: "100%",
-
                 padding: "11px",
-
                 background: "#064e43",
-
                 color: "white",
-
                 border: "1px solid #0b6255",
-
                 borderRadius: "6px",
-
                 cursor: "pointer",
-
                 fontWeight: "600",
               }}
             >
