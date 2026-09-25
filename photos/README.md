@@ -13,4 +13,4 @@
 | 05-sports-basketball.jpg | Sports | [来源](https://www.pexels.com/photo/uniformed-people-playing-basketball-8060004/) |
 | 06-social-picnic.jpg | Social | [来源](https://www.pexels.com/photo/group-of-friends-celebrating-outdoors-picnic-36713421/) |
 
-演示：创建未来活动并选类型和图片；首页 Featured Event 自动展示最近的未来活动。编辑这场活动，替换图片并修改类型，返回首页验证更新。
+演示：创建未来活动并选类型和图片；首页 Featured Event 自动展示报名人数最多的未来活动，人数相同时优先开始时间更近的活动。编辑这场活动，替换图片并修改类型，返回首页验证更新。

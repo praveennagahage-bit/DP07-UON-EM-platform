@@ -1,6 +1,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { upcomingEvents } = require('../shared/featuredEvent.mjs');
+const { upcomingEvents, featuredEvent } = require('../shared/featuredEvent.mjs');
+
+test('Featured event favors registrations, then earlier start and ID; excludes past and cancelled events', () => {
+  const now = Date.parse('2026-09-25T00:00:00Z');
+  const base = { status: 'active', date: '2099-01-01', time: '10:00', registeredCount: 2 };
+  const early = { ...base, id: 1 };
+  const popular = { ...base, id: 2, date: '2099-02-01', registeredCount: 5 };
+  const events = [early, popular, { ...base, id: 3, status: 'cancelled', registeredCount: 100 },
+    { ...base, id: 4, date: '2000-01-01', registeredCount: 100 }];
+  assert.equal(featuredEvent(events, now), popular);
+  assert.equal(upcomingEvents(events, now)[0], early);
+  assert.equal(featuredEvent([{ ...popular, id: 8 }, popular], now), popular);
+  assert.equal(featuredEvent([{ ...popular, registeredCount: 2 }, early], now), early);
+  assert.equal(featuredEvent([], now), undefined);
+});
 
 test('Featured selection uses real upcoming active events, Sydney time and stable chronological order', () => {
   const base = { status: 'active', date: '2026-10-05', time: '10:00' };

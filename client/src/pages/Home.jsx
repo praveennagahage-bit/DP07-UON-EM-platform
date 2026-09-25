@@ -4,7 +4,7 @@ import defaultEventImage from "../assets/hero.png";
 import { apiFetch } from "../api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { upcomingEvents as selectUpcomingEvents } from '../../../shared/featuredEvent.mjs';
+import { upcomingEvents as selectUpcomingEvents, featuredEvent } from '../../../shared/featuredEvent.mjs';
 
 function Home() {
   const navigate = useNavigate();
@@ -495,7 +495,7 @@ function Home() {
 
           {/* Featured event card */}
 
-          <FeaturedEvent event={allEvents[0]} loading={loading} error={eventError} />
+          <FeaturedEvent event={featuredEvent(allEvents)} loading={loading} error={eventError} />
 
           {/* =====================================================
               EVENTS HEADING
