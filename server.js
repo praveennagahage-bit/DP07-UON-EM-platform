@@ -129,9 +129,14 @@ function createApp(db, options = {}) {
     // GET EVENTS: public data plus this session's registration state.
     app.get('/events', async (req, res) => {
         const query = text(req.query.q);
-        const filter = query ? " WHERE instr(lower(events.title), lower(?)) > 0 OR instr(lower(coalesce(events.category, '')), lower(?)) > 0 OR instr(lower(events.location), lower(?)) > 0" : '';
+        const category = text(req.query.category);
+        if (category && !['Workshop', 'Seminar', 'Social', 'Sports'].includes(category)) throw fail(400, 'Select a valid category');
+        const conditions = [];
+        if (query) conditions.push("(instr(lower(events.title), lower(?)) > 0 OR instr(lower(coalesce(events.category, '')), lower(?)) > 0 OR instr(lower(events.location), lower(?)) > 0)");
+        if (category) conditions.push('events.category = ?');
+        const filter = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
         res.json(await db.all(eventSelect + filter + ' ORDER BY events.id DESC',
-            [req.user?.id || null, ...(query ? [query, query, query] : [])]));
+            [req.user?.id || null, ...(query ? [query, query, query] : []), ...(category ? [category] : [])]));
     });
     app.get('/events/:id', async (req, res) => {
         const event = await db.get(eventSelect + ' WHERE events.id = ?', [req.user?.id || null, req.params.id]);

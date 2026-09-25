@@ -4,6 +4,7 @@ import defaultEventImage from "../assets/hero.png";
 import { apiFetch } from "../api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { upcomingEvents as selectUpcomingEvents } from '../../../shared/featuredEvent.mjs';
 
 function Home() {
   const navigate = useNavigate();
@@ -42,9 +43,7 @@ function Home() {
 
         const data = await response.json();
 
-        setAllEvents(
-          data.filter((event) => event.status === "active")
-        );
+        setAllEvents(selectUpcomingEvents(data));
       } catch (error) {
         console.error("Could not load homepage events:", error);
         setEventError("Could not load upcoming events");
@@ -496,7 +495,7 @@ function Home() {
 
           {/* Featured event card */}
 
-          <FeaturedEvent />
+          <FeaturedEvent event={allEvents[0]} loading={loading} error={eventError} />
 
           {/* =====================================================
               EVENTS HEADING

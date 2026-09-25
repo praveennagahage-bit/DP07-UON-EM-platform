@@ -20,20 +20,20 @@ export default function Events({ bookings = false }) {
     : (
         params.get("q") ||
         params.get("search") ||
-        params.get("category") ||
         ""
       ).trim();
 
   return (
     <EventResults
-      key={[bookings, searchQuery, user?.id].join(":")}
+      key={[bookings, searchQuery, params.get('category'), user?.id].join(":")}
       bookings={bookings}
       query={searchQuery}
+      category={bookings ? '' : (params.get('category') || '').trim()}
     />
   );
 }
 
-function EventResults({ bookings, query }) {
+function EventResults({ bookings, query, category }) {
   const { user } = useAuth();
 
   const [events, setEvents] = useState([]);
@@ -53,10 +53,11 @@ function EventResults({ bookings, query }) {
   const endpoint = bookings
     ? "/me/registrations"
     : "/events" +
-      (query
+      (query || category
         ? "?" +
           new URLSearchParams({
-            q: query,
+            ...(query ? { q: query } : {}),
+            ...(category ? { category } : {}),
           })
         : "");
 
@@ -119,7 +120,7 @@ function EventResults({ bookings, query }) {
           <h1>
             {bookings
               ? "My Bookings"
-              : query
+              : query || category
               ? "Search Results"
               : "All Events"}
           </h1>
@@ -138,11 +139,11 @@ function EventResults({ bookings, query }) {
           SEARCH SUMMARY
       ====================================================== */}
 
-      {query && (
+      {(query || category) && (
         <div className="search-summary">
           <p>
-            Results for <strong>“{query}”</strong> — matching title,
-            category or location.
+            {category && <>Event type: <strong>{category}</strong>. </>}
+            {query && <>Results for <strong>“{query}”</strong> — matching title, category or location.</>}
           </p>
 
           <Link
@@ -158,7 +159,7 @@ function EventResults({ bookings, query }) {
           RESULT COUNT
       ====================================================== */}
 
-      {!loading && !error && query && (
+      {!loading && !error && (query || category) && (
         <p role="status">
           {events.length}{" "}
           {events.length === 1 ? "event" : "events"} found
@@ -205,7 +206,7 @@ function EventResults({ bookings, query }) {
             <p>
               {bookings
                 ? "You have no event bookings yet."
-                : query
+                : query || category
                 ? "No events match your search. Try another title, category or location."
                 : "No events are currently available."}
             </p>

@@ -38,6 +38,21 @@ async function fixture(t) {
     return { db, request, account, event };
 }
 
+test('Event types persist on create/edit and category filters do not match titles or locations', async t => {
+    const { request, account, event } = await fixture(t);
+    const owner = await account('organizer');
+    const workshop = await event(owner, { title: 'Coding lab', category: 'Workshop' });
+    const seminar = await event(owner, { title: 'Workshop careers', location: 'Workshop building', category: 'Seminar' });
+    assert.deepEqual((await request('/events?category=Workshop')).data.map(e => e.id), [workshop]);
+    assert.equal((await request('/events?q=Workshop')).data.length, 2);
+    assert.deepEqual((await request('/events?category=Seminar&q=careers')).data.map(e => e.id), [seminar]);
+    assert.equal((await request('/events?category=Unknown')).status, 400);
+    for (const category of ['Workshop', 'Seminar', 'Social', 'Sports']) {
+        assert.equal((await request('/events/' + workshop, { method: 'PUT', cookie: owner.cookie, body: { ...eventData, category } })).status, 200);
+        assert.equal((await request('/events/' + workshop)).data.category, category);
+    }
+});
+
 test('Session cookie, server-side role, logout, expiry and forged tokens', async t => {
     const { db, request, account } = await fixture(t);
     const user = await account();

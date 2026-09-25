@@ -1,5 +1,14 @@
 # 新增功能 Demo 指南
 
+## 真实 Featured Event 与图片演示
+
+- Featured Event 保留原卡片设计，自动选择开始时间最近、未取消且尚未开始的真实活动；相同时间按活动 ID 排序。没有符合条件的活动时显示空状态。
+- 活动图片、标题、说明、类型、地点、日期和报名人数均来自数据库。View Event 进入对应详情，创建者可从详情进入编辑。
+- Create / Edit 表单的 Location 下方有 Event type / Category，支持 Workshop、Seminar、Social、Sports。保存后重新进入首页即可看到更新。
+- 首页分类入口使用精确类别筛选，关键词搜索仍可匹配标题、地点和类型。
+- 项目 photos 文件夹提供 6 张小于 2 MiB 的 JPEG 演示图片，图片来源和使用说明见 photos/README.md。
+- 演示顺序：创建最近一场未来活动并选 Seminar、上传 03-seminar-speaker.jpg → 返回首页查看真实 Featured Event → View Event → Edit 改类型为 Workshop 并换 01-workshop-team.jpg → 返回首页检查图片及类型 → 点击 Workshop 分类查看结果。
+
 ## 展示目标
 
 从原来的“登录 + 活动 CRUD”推进到完整的活动参与流程：

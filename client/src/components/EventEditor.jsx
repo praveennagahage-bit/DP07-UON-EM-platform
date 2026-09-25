@@ -92,7 +92,8 @@ export default function EventEditor({ editing = false }) {
       <div className="form-row"><label>Date<input name="date" type="date" min={clock.date} value={form.date} onChange={change} required /></label>
       <TimePicker value={form.time} disabled={busy} onChange={time => setForm(previous => ({ ...previous, time }))} /></div>
       <label>Location<input name="location" value={form.location} onChange={change} required maxLength={300} /></label>
-      <label>Category<select name="category" value={form.category} onChange={change}>{['Workshop', 'Seminar', 'Social', 'Sports'].map(category => <option key={category}>{category}</option>)}</select></label>
+      <label>Event type / Category<select name="category" value={form.category} onChange={change} required>{['Workshop', 'Seminar', 'Social', 'Sports'].map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+      <p className="muted">Choose Workshop, Seminar, Social or Sports. You can change the event type when editing.</p>
       <label>Capacity<input name="capacity" type="number" min="1" step="1" value={form.capacity} onChange={change} required /></label>
       <p className="muted">Capacity is the maximum number of attendees. It cannot be lower than the current registration count.</p>
       {error && <p className="error" role="alert">{error}</p>}

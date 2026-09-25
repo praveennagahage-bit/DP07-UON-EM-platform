@@ -1,7 +1,12 @@
 import "./FeaturedEvent.css";
-import featuredImage from "../assets/featured-event.jpg";
+import featuredImage from "../assets/hero.png";
+import { useNavigate } from 'react-router-dom';
 
-export default function FeaturedEvent() {
+export default function FeaturedEvent({ event, loading, error }) {
+  const navigate = useNavigate();
+  if (loading) return <p role="status">Loading featured event…</p>;
+  if (error) return <p role="alert">Could not load the featured event. Please refresh to try again.</p>;
+  if (!event) return <p>No upcoming events to feature yet.</p>;
   return (
     <section className="featured-section">
 
@@ -11,8 +16,8 @@ export default function FeaturedEvent() {
         {/* LEFT IMAGE */}
         <div className="featured-image-wrapper">
           <img
-            src={featuredImage}
-            alt="Featured Event"
+            src={event.imageUrl || featuredImage}
+            alt={event.title}
             className="featured-image"
           />
 
@@ -25,16 +30,15 @@ export default function FeaturedEvent() {
         <div className="featured-content">
 
           <span className="featured-category">
-            SEMINAR
+            {event.category}
           </span>
 
           <h2 className="featured-title">
-            Future Careers: Industry Insights Panel
+            {event.title}
           </h2>
 
           <p className="featured-description">
-            Hear from UON alumni and industry experts about career paths,
-            job opportunities and how to stand out in today&apos;s market.
+            {event.description || 'Explore this upcoming UON event.'}
           </p>
 
           {/* Event Information */}
@@ -42,17 +46,17 @@ export default function FeaturedEvent() {
 
             <div className="meta-item">
               <span className="meta-icon">▣</span>
-              <span>Wed, 22 Oct 2025</span>
+              <span>{event.date}</span>
             </div>
 
             <div className="meta-item">
               <span className="meta-icon">◷</span>
-              <span>2:00 PM – 4:00 PM</span>
+              <span>{event.time} (Australia/Sydney)</span>
             </div>
 
             <div className="meta-item">
               <span className="meta-icon">⌖</span>
-              <span>Newton Lecture Theatre</span>
+              <span>{event.location}</span>
             </div>
 
           </div>
@@ -62,21 +66,14 @@ export default function FeaturedEvent() {
 
             <div className="attendees">
 
-              <div className="avatar-stack">
-                <div className="avatar">J</div>
-                <div className="avatar">M</div>
-                <div className="avatar">A</div>
-                <div className="avatar">S</div>
-              </div>
-
               <span className="attendee-text">
-                120+ students attending
+                {event.registeredCount} / {event.capacity} registered{event.registeredCount >= event.capacity ? ' · Event full' : ''}
               </span>
 
             </div>
 
-            <button className="featured-button">
-              Save My Spot
+            <button className="featured-button" onClick={() => navigate('/events/' + event.id)}>
+              View Event
               <span>→</span>
             </button>
 
