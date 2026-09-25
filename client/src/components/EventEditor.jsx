@@ -3,6 +3,7 @@ import { eventLocalNow, isFutureEvent } from '../../../shared/eventTime.mjs';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
+import TimePicker from './TimePicker';
 
 export default function EventEditor({ editing = false }) {
   const { id } = useParams();
@@ -89,7 +90,7 @@ export default function EventEditor({ editing = false }) {
       {imageError && <p className="error" role="alert">{imageError}</p>}
       <p className="muted">Event date and time use Australia/Sydney. Past dates and times cannot be selected.</p>
       <div className="form-row"><label>Date<input name="date" type="date" min={clock.date} value={form.date} onChange={change} required /></label>
-      <label>Time<input name="time" type="time" min={form.date === clock.date ? clock.time : undefined} value={form.time} onChange={change} required /></label></div>
+      <TimePicker value={form.time} disabled={busy} onChange={time => setForm(previous => ({ ...previous, time }))} /></div>
       <label>Location<input name="location" value={form.location} onChange={change} required maxLength={300} /></label>
       <label>Category<select name="category" value={form.category} onChange={change}>{['Workshop', 'Seminar', 'Social', 'Sports'].map(category => <option key={category}>{category}</option>)}</select></label>
       <label>Capacity<input name="capacity" type="number" min="1" step="1" value={form.capacity} onChange={change} required /></label>

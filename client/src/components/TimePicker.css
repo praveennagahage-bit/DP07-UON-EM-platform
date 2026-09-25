@@ -1,0 +1,11 @@
+.time-picker { flex: 1; min-width: 0; }
+.time-picker-trigger { display: flex; justify-content: space-between; width: 100%; margin-top: 6px; padding: 12px; border: 1px solid #555; border-radius: 6px; background: #171717; color: #fff; cursor: pointer; font: inherit; }
+.time-picker-panel { margin-top: 8px; padding: 14px; background: #171c1b; border: 1px solid #55776d; border-radius: 8px; }
+.time-picker-panel p { font-size: 13px; }
+.time-picker-panel select { display: block; width: 100%; height: 210px; overflow-y: scroll; scrollbar-width: auto; scrollbar-color: #86cbb9 #26332f; padding: 0; margin: 10px 0; }
+.time-picker-panel select option { padding: 10px 14px; }
+.time-picker-panel select::-webkit-scrollbar { width: 18px; }
+.time-picker-panel select::-webkit-scrollbar-track { background: #26332f; }
+.time-picker-panel select::-webkit-scrollbar-thumb { background: #86cbb9; border: 3px solid #26332f; border-radius: 8px; }
+.time-picker button:focus-visible, .time-picker select:focus-visible { outline: 3px solid #86cbb9; outline-offset: 2px; }
+.time-picker-panel .actions { flex-wrap: wrap; }
