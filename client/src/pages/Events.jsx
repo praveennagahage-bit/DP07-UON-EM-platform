@@ -80,9 +80,6 @@ function EventResults({ bookings, query }) {
   useEffect(() => {
     let active = true;
 
-    setLoading(true);
-    setError("");
-
     api(endpoint)
       .then((data) => {
         if (active) {
