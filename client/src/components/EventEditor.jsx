@@ -14,6 +14,8 @@ export default function EventEditor({ editing = false }) {
   const [imageError, setImageError] = useState('');
   const [readingImage, setReadingImage] = useState(false);
   const imageVersion = useRef(0);
+  const imageInput = useRef(null);
+  const [imageName, setImageName] = useState('');
   useEffect(() => {
     const timer = setInterval(() => setClock(eventLocalNow()), 30000);
     const sequence = imageVersion;
@@ -42,6 +44,8 @@ export default function EventEditor({ editing = false }) {
   function chooseImage(e) {
     const file = e.target.files[0];
     if (!file) return;
+    // Reset the native control so choosing the same file again still fires change.
+    e.target.value = '';
     const version = ++imageVersion.current;
     setImageError(''); setReadingImage(false);
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
@@ -52,6 +56,7 @@ export default function EventEditor({ editing = false }) {
     const reader = new FileReader();
     reader.onload = () => {
       if (version !== imageVersion.current) return;
+      setImageName(file.name);
       setForm(previous => ({ ...previous, image: reader.result })); setReadingImage(false);
     };
     reader.onerror = () => { if (version === imageVersion.current) { setImageError('Could not read this image. Please choose it again.'); setReadingImage(false); } };
@@ -59,6 +64,7 @@ export default function EventEditor({ editing = false }) {
   }
   function removeImage() {
     ++imageVersion.current; setImageError(''); setReadingImage(false);
+    setImageName('');
     setForm(previous => ({ ...previous, image: null }));
   }
   async function save(e) {
@@ -82,7 +88,14 @@ export default function EventEditor({ editing = false }) {
     <form className="event-form" onSubmit={save}>
       <label>Event title<input name="title" value={form.title} onChange={change} required maxLength={200} /></label>
       <label>Description<textarea name="description" value={form.description} onChange={change} rows={4} maxLength={5000} /></label>
-      <label>Event image (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseImage} disabled={busy} /></label>
+      <div>
+        <span id="event-image-label">Event image (optional)</span>
+        <input ref={imageInput} type="file" hidden accept="image/jpeg,image/png,image/webp" onChange={chooseImage} disabled={busy} aria-label="Event image (optional)" />
+        <div className="image-upload-control" role="group" aria-labelledby="event-image-label">
+          <button className="action secondary" type="button" onClick={() => imageInput.current?.click()} disabled={busy} aria-describedby="event-image-filename">Choose Image</button>
+          <span id="event-image-filename" className="image-upload-filename" role="status">{imageName || (preview ? 'Current event image' : 'No file selected')}</span>
+        </div>
+      </div>
       <p className="muted">JPEG, PNG or WebP, up to 2 MB and 16 megapixels. A preview is shown before saving.</p>
       {preview && <img className="event-cover image-preview" src={preview} alt="Event image preview" />}
       {(preview || imageError) && <button className="action secondary" type="button" onClick={removeImage} disabled={busy}>Remove Image</button>}
