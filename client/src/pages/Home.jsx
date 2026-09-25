@@ -1,18 +1,33 @@
-import defaultEventImage from '../assets/hero.png';
+import QuickActions from "../components/QuickActions";
+import FeaturedEvent from "../components/FeaturedEvent";
+import defaultEventImage from "../assets/hero.png";
 import { apiFetch } from "../api";
-import { useAuth } from "../auth/AuthContext";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
+  // Search
+  const [search, setSearch] = useState("");
+
+  // Events
   const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [eventError, setEventError] = useState("");
 
-  // Load events from the backend
+  // Search handler
+  const handleSearch = (e) => {
+    e.preventDefault();
+
+    if (search.trim()) {
+      navigate(`/events?search=${encodeURIComponent(search.trim())}`);
+    } else {
+      navigate("/events");
+    }
+  };
+
+  // Load events from backend
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -27,7 +42,9 @@ function Home() {
 
         const data = await response.json();
 
-        setAllEvents(data.filter(event => event.status === "active"));
+        setAllEvents(
+          data.filter((event) => event.status === "active")
+        );
       } catch (error) {
         console.error("Could not load homepage events:", error);
         setEventError("Could not load upcoming events");
@@ -39,7 +56,7 @@ function Home() {
     fetchEvents();
   }, []);
 
-  // Only show the first 3 events on the homepage
+  // Only show first 3 events
   const upcomingEvents = allEvents.slice(0, 3);
 
   // Dynamic category counts
@@ -59,16 +76,7 @@ function Home() {
     (event) => event.category === "Sports"
   ).length;
 
-  const itemStyle = {
-    padding: "12px 14px",
-    borderRadius: "6px",
-    background: "#171717",
-    border: "1px solid #2b2b2b",
-    color: "#f5f5f5",
-    cursor: "pointer",
-    transition: "0.2s ease",
-  };
-
+  // Reusable styles
   const categoryItem = {
     display: "flex",
     justifyContent: "space-between",
@@ -116,10 +124,15 @@ function Home() {
           alignItems: "flex-start",
         }}
       >
-        {/* LEFT SIDE */}
-        <div style={{ flex: 3, minWidth: 0 }}>
+        {/* =====================================================
+            LEFT SIDE
+        ====================================================== */}
 
-          {/* HERO SECTION */}
+        <div style={{ flex: 3, minWidth: 0 }}>
+          {/* =====================================================
+              HERO SECTION
+          ====================================================== */}
+
           <div
             style={{
               background:
@@ -132,9 +145,11 @@ function Home() {
           >
             <div
               style={{
-                maxWidth: "650px",
+                maxWidth: "760px",
               }}
             >
+              {/* SMALL HEADING */}
+
               <p
                 style={{
                   margin: "0 0 10px",
@@ -148,16 +163,29 @@ function Home() {
                 UON Event Management
               </p>
 
+              {/* MAIN HEADING */}
+
               <h1
                 style={{
                   margin: 0,
-                  fontSize: "38px",
-                  lineHeight: "1.15",
+                  fontSize: "42px",
+                  lineHeight: "1.12",
                   fontWeight: "700",
                 }}
               >
-                Discover Events at UON
+                Discover Amazing
+                <br />
+
+                <span
+                  style={{
+                    color: "#38e2b4",
+                  }}
+                >
+                  Events at UON
+                </span>
               </h1>
+
+              {/* HERO DESCRIPTION */}
 
               <p
                 style={{
@@ -168,29 +196,312 @@ function Home() {
                   lineHeight: "1.6",
                 }}
               >
-                Find workshops, seminars, social activities and university
-                events in one place.
+                Find workshops, seminars, social activities, sports and more.
+                <br />
+                Make the most of your university experience.
               </p>
 
-              <button
-                onClick={() => navigate("/events")}
+              {/* =====================================================
+                  BIG SEARCH BAR
+              ====================================================== */}
+
+              <form
+                onSubmit={handleSearch}
                 style={{
-                  marginTop: "26px",
-                  padding: "11px 22px",
-                  background: "#f5f5f5",
-                  color: "#111111",
-                  border: "1px solid #f5f5f5",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontWeight: "600",
+                  marginTop: "28px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  width: "100%",
                 }}
               >
-                Browse Events
-              </button>
+                {/* SEARCH INPUT */}
+
+                <div
+                  style={{
+                    position: "relative",
+                    flex: 1,
+                  }}
+                >
+                  {/* SEARCH ICON */}
+
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "18px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "#a9bbb7",
+                      fontSize: "18px",
+                      pointerEvents: "none",
+                      zIndex: 2,
+                    }}
+                  >
+                    🔍
+                  </span>
+
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search events, topics or categories..."
+                    style={{
+                      boxSizing: "border-box",
+                      width: "100%",
+                      height: "56px",
+                      padding: "0 20px 0 50px",
+                      background: "rgba(8, 29, 27, 0.90)",
+                      color: "#ffffff",
+                      border:
+                        "1px solid rgba(255, 255, 255, 0.22)",
+                      borderRadius: "9px",
+                      fontSize: "15px",
+                      outline: "none",
+                      boxShadow:
+                        "0 6px 20px rgba(0, 0, 0, 0.12)",
+                    }}
+                  />
+                </div>
+
+                {/* SEARCH BUTTON */}
+
+                <button
+                  type="submit"
+                  style={{
+                    height: "56px",
+                    padding: "0 26px",
+                    background: "#20dbaa",
+                    color: "#03231b",
+                    border: "none",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "9px",
+                    whiteSpace: "nowrap",
+                    boxShadow:
+                      "0 7px 20px rgba(32, 219, 170, 0.16)",
+                  }}
+                >
+                  Explore Events
+
+                  <span
+                    style={{
+                      fontSize: "18px",
+                    }}
+                  >
+                    →
+                  </span>
+                </button>
+              </form>
+
+              {/* =====================================================
+                  SMALL CATEGORY LINKS UNDER SEARCH
+              ====================================================== */}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "35px",
+                  marginTop: "25px",
+                }}
+              >
+                {/* WORKSHOPS */}
+
+                <div
+                  onClick={() =>
+                    navigate("/events?category=Workshop")
+                  }
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "9px",
+                  }}
+                >
+                  <span style={{ fontSize: "20px" }}>▣</span>
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Workshops
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#acd1c8",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Learn new skills
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEMINARS */}
+
+                <div
+                  onClick={() =>
+                    navigate("/events?category=Seminar")
+                  }
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "9px",
+                  }}
+                >
+                  <span style={{ fontSize: "20px" }}>▰</span>
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Seminars
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#acd1c8",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Gain insights
+                    </div>
+                  </div>
+                </div>
+
+                {/* SOCIAL */}
+
+                <div
+                  onClick={() =>
+                    navigate("/events?category=Social")
+                  }
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "9px",
+                  }}
+                >
+                  <span style={{ fontSize: "20px" }}>♙</span>
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Social
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#acd1c8",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Meet new people
+                    </div>
+                  </div>
+                </div>
+
+                {/* SPORTS */}
+
+                <div
+                  onClick={() =>
+                    navigate("/events?category=Sports")
+                  }
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "9px",
+                  }}
+                >
+                  <span style={{ fontSize: "20px" }}>⚽</span>
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Sports
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#acd1c8",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Stay active
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* EVENTS SECTION */}
+          {/* =====================================================
+              FEATURED EVENT SECTION
+          ====================================================== */}
+
+          <div
+            style={{
+              marginTop: "38px",
+              marginBottom: "18px",
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "22px",
+                fontWeight: "650",
+                display: "flex",
+                alignItems: "center",
+                gap: "9px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#35e6b5",
+                  fontSize: "22px",
+                }}
+              >
+                ★
+              </span>
+
+              Featured Event
+            </h2>
+          </div>
+
+          {/* Featured event card */}
+
+          <FeaturedEvent />
+
+          {/* =====================================================
+              EVENTS HEADING
+          ====================================================== */}
+
           <div
             style={{
               marginTop: "38px",
@@ -221,7 +532,10 @@ function Home() {
             </h2>
           </div>
 
-          {/* LOADING */}
+          {/* =====================================================
+              LOADING
+          ====================================================== */}
+
           {loading && (
             <p
               style={{
@@ -232,7 +546,10 @@ function Home() {
             </p>
           )}
 
-          {/* ERROR */}
+          {/* =====================================================
+              ERROR
+          ====================================================== */}
+
           {eventError && (
             <p
               style={{
@@ -243,7 +560,10 @@ function Home() {
             </p>
           )}
 
-          {/* NO EVENTS */}
+          {/* =====================================================
+              NO EVENTS
+          ====================================================== */}
+
           {!loading &&
             !eventError &&
             upcomingEvents.length === 0 && (
@@ -260,7 +580,10 @@ function Home() {
               </div>
             )}
 
-          {/* EVENT CARDS */}
+          {/* =====================================================
+              EVENT CARDS
+          ====================================================== */}
+
           <div
             style={{
               display: "flex",
@@ -280,6 +603,7 @@ function Home() {
                 }}
               >
                 {/* EVENT IMAGE */}
+
                 <img
                   src={event.imageUrl || defaultEventImage}
                   alt={event.title}
@@ -292,8 +616,13 @@ function Home() {
                   }}
                 />
 
-                <div style={{ padding: "18px" }}>
+                <div
+                  style={{
+                    padding: "18px",
+                  }}
+                >
                   {/* CATEGORY */}
+
                   <p
                     style={{
                       margin: "0 0 7px",
@@ -307,6 +636,7 @@ function Home() {
                   </p>
 
                   {/* TITLE */}
+
                   <h3
                     style={{
                       margin: "0 0 15px",
@@ -318,6 +648,7 @@ function Home() {
                   </h3>
 
                   {/* DATE */}
+
                   <p
                     style={{
                       margin: "6px 0",
@@ -329,6 +660,7 @@ function Home() {
                   </p>
 
                   {/* TIME */}
+
                   <p
                     style={{
                       margin: "6px 0",
@@ -340,6 +672,7 @@ function Home() {
                   </p>
 
                   {/* LOCATION */}
+
                   <p
                     style={{
                       margin: "6px 0",
@@ -351,6 +684,7 @@ function Home() {
                   </p>
 
                   {/* VIEW DETAILS */}
+
                   <button
                     onClick={() =>
                       navigate(`/events/${event.id}`)
@@ -375,60 +709,31 @@ function Home() {
           </div>
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* =====================================================
+            RIGHT SIDE
+        ====================================================== */}
+
         <div
           style={{
             flex: 1,
             minWidth: "280px",
           }}
         >
-          {/* QUICK ACTIONS */}
-          <div style={sidebarCardStyle}>
-            <p
-              style={{
-                margin: "0 0 6px",
-                color: "#7fb7aa",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "1.1px",
-                fontWeight: "600",
-              }}
-            >
-              Shortcuts
-            </p>
+          {/* =====================================================
+              QUICK ACTIONS
+          ====================================================== */}
 
-            <h3
-              style={{
-                margin: "0 0 18px",
-                color: "#ffffff",
-              }}
-            >
-              Quick Actions
-            </h3>
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}
-            >
-              {user?.role === "organizer" && <button
-                style={itemStyle}
-                onClick={() => navigate("/create")}
-              >
-                Create New Event →
-              </button>}
-
-              {user?.role === "attendee" && <button style={itemStyle} onClick={() => navigate("/bookings")}>My Bookings →</button>}
-
-              <div style={itemStyle}>
-                Update Profile →
-              </div>
-            </div>
+          <div
+          className="sidebar"
+          style={{ marginBottom: "20px" }}
+          >
+            <QuickActions />
           </div>
 
-          {/* CATEGORIES */}
+          {/* =====================================================
+              CATEGORIES
+          ====================================================== */}
+
           <div style={sidebarCardStyle}>
             <p
               style={{
@@ -459,34 +764,90 @@ function Home() {
                 gap: "9px",
               }}
             >
-              <div style={activeCategory}>
+              {/* ALL EVENTS */}
+
+              <div
+                style={{
+                  ...activeCategory,
+                  cursor: "pointer",
+                }}
+                onClick={() => navigate("/events")}
+              >
                 All Events
+
                 <span>{allEvents.length}</span>
               </div>
 
-              <div style={categoryItem}>
+              {/* WORKSHOPS */}
+
+              <div
+                style={{
+                  ...categoryItem,
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  navigate("/events?category=Workshop")
+                }
+              >
                 Workshops
+
                 <span>{workshopCount}</span>
               </div>
 
-              <div style={categoryItem}>
+              {/* SEMINARS */}
+
+              <div
+                style={{
+                  ...categoryItem,
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  navigate("/events?category=Seminar")
+                }
+              >
                 Seminars
+
                 <span>{seminarCount}</span>
               </div>
 
-              <div style={categoryItem}>
+              {/* SOCIAL */}
+
+              <div
+                style={{
+                  ...categoryItem,
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  navigate("/events?category=Social")
+                }
+              >
                 Social
+
                 <span>{socialCount}</span>
               </div>
 
-              <div style={categoryItem}>
+              {/* SPORTS */}
+
+              <div
+                style={{
+                  ...categoryItem,
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  navigate("/events?category=Sports")
+                }
+              >
                 Sports
+
                 <span>{sportsCount}</span>
               </div>
             </div>
           </div>
 
-          {/* SUBSCRIBE */}
+          {/* =====================================================
+              SUBSCRIBE
+          ====================================================== */}
+
           <div style={sidebarCardStyle}>
             <p
               style={{
