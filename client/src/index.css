@@ -125,3 +125,67 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
 .image-upload-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; padding: 10px; border: 1px solid #555; border-radius: 6px; background: #171717; }
 .image-upload-filename { min-width: 0; overflow-wrap: anywhere; }
 .image-upload-control button:focus-visible { outline: 3px solid #86cbb9; outline-offset: 2px; }
+
+/* Content stays readable at narrow widths; cards keep actions aligned. */
+.page, .panel, .card-body, .navbar > div { min-width: 0; }
+.page h1, .page h2, .page p, .navbar, .featured-content { overflow-wrap: anywhere; }
+.event-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); align-items: stretch; }
+.event-card, .card-body, .home-event-card, .home-card-body { display: flex; flex-direction: column; min-width: 0; }
+.card-body, .home-card-body { flex: 1; }
+.card-title, .card-location, .card-description, .home-card-title, .home-card-location, .featured-description {
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.card-title, .home-card-title { -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.35; min-height: 2.7em; }
+.card-location, .home-card-location { -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.5; min-height: 3em; }
+.card-description, .featured-description { -webkit-line-clamp: 3; line-clamp: 3; }
+.card-actions { margin-top: auto; padding-top: 10px; }
+.card-actions > .action { width: 100%; margin-top: 10px; }
+.home-event-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.home-event-card { width: auto !important; }
+.home-card-body > button { margin-top: auto !important; min-height: 44px; }
+.home-card-location { margin-bottom: 16px !important; }
+.home-main { min-width: 0; }
+.home-sidebar { min-width: 0 !important; }
+.featured-content, .featured-meta, .meta-item, .featured-bottom { min-width: 0; }
+.featured-title { overflow-wrap: anywhere; }
+.meta-item { max-width: 100%; overflow-wrap: anywhere; }
+.admin-tabs { justify-content: flex-start; }
+.admin-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.admin-row { min-width: 0; border: 1px solid #444; border-radius: 8px; padding: 18px; overflow-wrap: anywhere; }
+.admin-row pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: #ffaaaa; }
+.auth-shell { height: auto; min-height: calc(100vh - 100px); overflow: visible; }
+.auth-form-wrap, .auth-left-content { height: auto; }
+@media (max-width: 1100px) {
+  .home-layout { flex-direction: column; }
+  .home-main, .home-sidebar { width: 100%; flex: auto !important; }
+}
+@media (max-width: 640px) {
+  .home-page { padding: 20px 16px !important; }
+  .home-hero { padding: 28px 20px !important; }
+  .home-hero h1 { font-size: 32px !important; }
+  .home-search { flex-direction: column; align-items: stretch !important; }
+  .home-search > div { width: 100%; }
+  .home-event-grid { grid-template-columns: 1fr; }
+  .home-event-card img { height: 190px !important; }
+  .featured-section { padding: 0; }
+  .featured-content { padding: 20px; }
+  .navbar > div { max-width: 100%; }
+  .navbar > div:last-child { width: 100%; }
+  .navbar .event-search { flex-basis: calc(100% - 65px); }
+  .navbar a, .navbar button { min-height: 44px; }
+  .navbar > div:nth-child(2) { display: flex; gap: 12px; }
+  .navbar > div:nth-child(2) > a { margin-right: 0 !important; display: inline-flex; align-items: center; }
+  .page input, .page textarea, .page select, .auth-form input, .auth-form select { font-size: 16px; min-width: 0; }
+  .page button, .page .action, .quick-action-item, .home-search button { min-height: 44px; }
+  .auth-left { padding: 24px; min-height: auto; }
+  .auth-left-content { padding-left: 0; }
+  .auth-steps { display: none; }
+  .auth-right { padding: 26px 18px; }
+  .auth-form-wrap h2 { font-size: 30px; }
+  .table-scroll { max-width: 100%; }
+  .search-results li { flex-wrap: wrap; }
+  .notification-filters { flex-wrap: wrap; }
+}
+
+.event-search button { flex-shrink: 0; white-space: nowrap; overflow-wrap: normal; }

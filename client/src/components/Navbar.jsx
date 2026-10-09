@@ -102,6 +102,8 @@ function Navbar() {
       </div>
 
       {error && <p role="alert" className="error">{error}</p>}
+      {currentUser && <Link to="/profile" style={linkStyle('/profile')}>Profile</Link>}
+      {currentUser?.role === 'admin' && <Link to="/admin" style={linkStyle('/admin')}>Administration</Link>}
       {/* RIGHT SIDE */}
       <div
         style={{

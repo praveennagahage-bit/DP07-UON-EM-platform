@@ -3,7 +3,8 @@
 }
 
 .auth-page {
-  min-height: 100vh;
+  min-min-height: calc(100vh - 100px);
+  height: auto;
   background: #1d1d1d;
   display: flex;
   align-items: center;
@@ -18,7 +19,7 @@
   background: #000;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -40,7 +41,7 @@
 }
 
 .auth-left-content {
-  height: 400px;
+  height: auto;
   padding-left: 30px;
   position: relative;
   z-index: 2;
@@ -117,7 +118,7 @@
 
 .auth-form-wrap {
   width: 100%;
-  height: 600px;
+  height: auto;
   max-width: 580px;
 }
 
@@ -293,4 +294,12 @@
   .auth-left-content h1 {
     font-size: 2.2rem;
   }
+}
+@media (max-width: 640px) {
+ .auth-left { padding: 24px; min-height: auto; }
+ .auth-left-content { padding-left: 0; }
+ .auth-steps { display: none; }
+ .auth-right { padding: 26px 18px; }
+ .auth-form-wrap h2 { font-size: 30px; }
+ .auth-form input, .auth-form select { font-size: 16px; min-width: 0; }
 }

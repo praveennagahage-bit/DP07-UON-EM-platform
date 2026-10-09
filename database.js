@@ -98,7 +98,40 @@ async function createDatabase(filename = process.env.DB_PATH || path.join(__dirn
                 SELECT userId, NEW.id, NEW.title, NEW.cancellationReason
                 FROM registrations WHERE eventId = NEW.id;
             END;`);
-        return { run, get, all, close };
+        const userColumns = await all('PRAGMA table_info(users)');
+        for (const [name, definition] of [['status', "TEXT NOT NULL DEFAULT 'active'"], ['banReason', "TEXT NOT NULL DEFAULT ''"], ['bio', "TEXT NOT NULL DEFAULT ''"]]) {
+            if (!userColumns.some(column => column.name === name)) await run('ALTER TABLE users ADD COLUMN ' + name + ' ' + definition);
+        }
+        await exec(`CREATE TABLE IF NOT EXISTS admin_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actorId INTEGER NOT NULL REFERENCES users(id),
+            action TEXT NOT NULL, targetType TEXT NOT NULL, targetId INTEGER NOT NULL,
+            reason TEXT NOT NULL, details TEXT NOT NULL DEFAULT '',
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE TRIGGER IF NOT EXISTS revoke_banned_sessions AFTER UPDATE OF status ON users
+        WHEN NEW.status = 'banned' BEGIN DELETE FROM sessions WHERE userId = NEW.id; END;
+        CREATE TRIGGER IF NOT EXISTS reject_banned_session BEFORE INSERT ON sessions
+        WHEN (SELECT status FROM users WHERE id = NEW.userId) != 'active'
+        BEGIN SELECT RAISE(ABORT, 'Account is suspended'); END;
+        CREATE TRIGGER IF NOT EXISTS reject_banned_registration BEFORE INSERT ON registrations
+        WHEN (SELECT status FROM users WHERE id = NEW.userId) = 'banned'
+        BEGIN SELECT RAISE(ABORT, 'Account is suspended'); END;`);
+        // Serialize access to this connection: transactions must not include another
+        // request's writes or expose partially updated data to concurrent readers.
+        let queue = Promise.resolve();
+        const enqueue = work => {
+            const result = queue.then(work);
+            queue = result.catch(() => {});
+            return result;
+        };
+        const transaction = work => enqueue(async () => {
+            await run('BEGIN IMMEDIATE');
+            try { const result = await work({ run, get, all }); await run('COMMIT'); return result; }
+            catch (error) { await run('ROLLBACK'); throw error; }
+        });
+        return { run: (...args) => enqueue(() => run(...args)), get: (...args) => enqueue(() => get(...args)),
+            all: (...args) => enqueue(() => all(...args)), close: () => enqueue(close), transaction };
     } catch (error) {
         await close();
         throw error;

@@ -1,8 +1,10 @@
+import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./QuickActions.css";
 
 export default function QuickActions() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <div className="quick-actions-card">
@@ -38,13 +40,13 @@ export default function QuickActions() {
         {/* My Bookings */}
         <button
           className="quick-action-item"
-          onClick={() => navigate("/bookings")}
+          onClick={() => navigate(user?.role === "admin" ? "/admin" : user?.role === "organizer" ? "/create" : "/bookings")}
         >
           <div className="quick-action-icon">◇</div>
 
           <div className="quick-action-text">
-            <h4>My Bookings</h4>
-            <p>View registered events</p>
+            <h4>{user?.role === "admin" ? "Administration" : user?.role === "organizer" ? "Create Event" : "My Bookings"}</h4>
+            <p>{user?.role === "admin" ? "Manage the platform" : user?.role === "organizer" ? "Organize an activity" : "View registered events"}</p>
           </div>
         </button>
 

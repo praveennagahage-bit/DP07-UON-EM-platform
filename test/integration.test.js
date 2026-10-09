@@ -42,10 +42,10 @@ test('Event types persist on create/edit and category filters do not match title
     const { request, account, event } = await fixture(t);
     const owner = await account('organizer');
     const workshop = await event(owner, { title: 'Coding lab', category: 'Workshop' });
-    const seminar = await event(owner, { title: 'Workshop careers', location: 'Workshop building', category: 'Seminar' });
+    const seminar = await event(owner, { title: 'Workshop career', location: 'Workshop building', category: 'Seminar' });
     assert.deepEqual((await request('/events?category=Workshop')).data.map(e => e.id), [workshop]);
     assert.equal((await request('/events?q=Workshop')).data.length, 2);
-    assert.deepEqual((await request('/events?category=Seminar&q=careers')).data.map(e => e.id), [seminar]);
+    assert.deepEqual((await request('/events?category=Seminar&q=career')).data.map(e => e.id), [seminar]);
     assert.equal((await request('/events?category=Unknown')).status, 400);
     for (const category of ['Workshop', 'Seminar', 'Social', 'Sports']) {
         assert.equal((await request('/events/' + workshop, { method: 'PUT', cookie: owner.cookie, body: { ...eventData, category } })).status, 200);
@@ -244,7 +244,7 @@ test('Search matches title, category and location, trims whitespace and treats S
 test('Cancellation notifies current self/admin registrations, excludes removed and unrelated users', async t => {
     const { request, account, event } = await fixture(t);
     const owner = await account('organizer'), alice = await account(), bob = await account(), removed = await account(), unrelated = await account();
-    const id = await event(owner, { capacity: 4, title: 'Cancelled workshop' });
+    const id = await event(owner, { capacity: 4, title: 'Cancelled lab' });
     await request('/events/' + id + '/register', { method: 'POST', cookie: alice.cookie });
     await request('/events/' + id + '/attendees', { method: 'POST', cookie: owner.cookie, body: { userId: bob.id } });
     await request('/events/' + id + '/register', { method: 'POST', cookie: removed.cookie });
@@ -258,7 +258,7 @@ test('Cancellation notifies current self/admin registrations, excludes removed a
         assert.equal(result.data.notifications.length, 1);
         const notification = result.data.notifications[0];
         assert.equal(notification.eventId, id);
-        assert.equal(notification.eventTitle, 'Cancelled workshop');
+        assert.equal(notification.eventTitle, 'Cancelled lab');
         assert.equal(notification.message, 'Presenter unavailable');
         assert.equal(notification.isRead, 0);
         assert.ok(Number.isFinite(Date.parse(notification.createdAt)));
@@ -404,4 +404,136 @@ test('Old events remain readable but cannot accept self or manual registrations;
     assert.equal((await request('/events/' + id + '/attendees', { method: 'POST', cookie: owner.cookie, body: { userId: user.id } })).status, 409);
     await db.run('UPDATE events SET createdBy = NULL WHERE id = ?', [id]);
     assert.equal((await request('/events/' + id, { method: 'PUT', cookie: owner.cookie, body: { ...eventData, createdBy: owner.id } })).status, 403);
+});
+
+async function administrator(f) {
+    const user = await f.account();
+    const { grantAdmin } = require('../scripts/grant-admin.cjs');
+    await grantAdmin(f.db, user.email);
+    assert.equal((await f.request('/me', { cookie: user.cookie })).status, 401);
+    const login = await f.request('/login', { method: 'POST', body: { email: user.email, password: 'demo-password' } });
+    return { ...user, cookie: login.cookie.split(';')[0] };
+}
+
+test('Text limits count Unicode characters, preserve plain text and reject invalid event data on create/edit', async t => {
+    const f = await fixture(t), owner = await f.account('organizer');
+    const id = await f.event(owner);
+    const valid = { ...eventData, title: '学'.repeat(15), description: '学'.repeat(500), location: 'Room 201', capacity: 10000 };
+    assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: valid })).status, 201);
+    for (const change of [
+        { title: 'a'.repeat(16) }, { title: '   ' }, { title: '!!!' },
+        { description: 'a'.repeat(501) }, { description: '<script>alert(1)</script>' },
+        { description: 'javascript:alert(1)' }, { description: 'bad\u0000text' },
+        { location: '123' }, { location: '   ' }, { location: 'a'.repeat(121) },
+        { capacity: 10001 }, { capacity: 1.2 }, { capacity: '2' }, { capacity: 0 },
+    ]) {
+        for (const [route, method] of [['/events', 'POST'], ['/events/' + id, 'PUT']]) {
+            assert.equal((await f.request(route, { method, cookie: owner.cookie, body: { ...eventData, ...change } })).status, 400, JSON.stringify(change));
+        }
+    }
+    assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: { ...eventData, title: 'JavaScript 101', description: "O'Brien & friends — learn JavaScript." } })).status, 201);
+    await f.db.run('UPDATE events SET title = ? WHERE id = ?', ['Legacy title longer than fifteen characters', id]);
+    assert.equal((await f.request('/events/' + id)).data.title, 'Legacy title longer than fifteen characters');
+    assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: owner.cookie, body: { ...eventData, title: 'Short title' } })).status, 200);
+});
+
+test('Profile is account-scoped, persistent, validated and cannot alter role, email or credentials', async t => {
+    const f = await fixture(t), alice = await f.account(), bob = await f.account();
+    const profile = { firstName: 'Alice', lastName: "O'Brien", bio: 'I enjoy JavaScript & sports.' };
+    assert.equal((await f.request('/me/profile', { method: 'PUT', body: profile })).status, 401);
+    assert.equal((await f.request('/me/profile', { method: 'PUT', cookie: alice.cookie, body: profile })).status, 200);
+    assert.equal((await f.request('/me', { cookie: alice.cookie })).data.user.bio, profile.bio);
+    assert.equal((await f.request('/me', { cookie: bob.cookie })).data.user.firstName, 'User2');
+    for (const extra of [{ role: 'admin' }, { userId: bob.id }, { email: bob.email }, { password: 'new-password' }, { status: 'active' }]) {
+        assert.equal((await f.request('/me/profile', { method: 'PUT', cookie: alice.cookie, body: { ...profile, ...extra } })).status, 400);
+    }
+    for (const change of [{ firstName: '' }, { lastName: 'a'.repeat(51) }, { bio: 'b'.repeat(301) }, { bio: '<img src=x>' }]) {
+        assert.equal((await f.request('/me/profile', { method: 'PUT', cookie: alice.cookie, body: { ...profile, ...change } })).status, 400);
+    }
+    const login = await f.request('/login', { method: 'POST', body: { email: alice.email, password: 'demo-password' } });
+    assert.equal(login.data.user.firstName, 'Alice');
+    assert.equal(login.data.user.role, 'attendee');
+    assert.equal(login.data.user.password, undefined);
+});
+
+test('Admin is provisioned locally, cannot be self-selected, and administrative APIs reject other roles', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), attendee = await f.account();
+    assert.equal((await f.request('/register', { method: 'POST', body: { firstName: 'Admin', lastName: 'Fake', email: 'fake@example.test', role: 'admin', password: 'demo-password' } })).status, 400);
+    for (const cookie of [undefined, owner.cookie, attendee.cookie]) {
+        for (const [route, method, body] of [['/admin/users', 'GET'], ['/admin/audit', 'GET'], ['/admin/users/' + attendee.id + '/status', 'PUT', { status: 'banned', reason: 'Abuse' }]]) {
+            assert.equal((await f.request(route, { method, body, cookie })).status, cookie ? 403 : 401);
+        }
+    }
+    const admin = await administrator(f);
+    assert.equal((await f.request('/me', { cookie: admin.cookie })).data.user.role, 'admin');
+    const list = await f.request('/admin/users', { cookie: admin.cookie });
+    assert.equal(list.status, 200);
+    assert.ok(list.data.every(user => user.password === undefined));
+    assert.equal((await f.request('/admin/audit', { cookie: admin.cookie })).data[0].action, 'grant_admin');
+});
+
+test('Admin suspension revokes all sessions, blocks login and manual registration; restoration needs a fresh login', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+    const otherLogin = await f.request('/login', { method: 'POST', body: { email: user.email, password: 'demo-password' } });
+    const id = await f.event(owner);
+    const status = (who, body) => f.request('/admin/users/' + who.id + '/status', { method: 'PUT', cookie: admin.cookie, body });
+    assert.equal((await status(user, { status: 'banned', reason: '' })).status, 400);
+    assert.equal((await status(admin, { status: 'banned', reason: 'Self ban' })).status, 403);
+    const admin2 = await administrator(f);
+    assert.equal((await status(admin2, { status: 'banned', reason: 'Other admin' })).status, 403);
+    assert.equal((await status(user, { status: 'banned', reason: 'Spam reports' })).status, 200);
+    for (const cookie of [user.cookie, otherLogin.cookie.split(';')[0]]) {
+        assert.equal((await f.request('/me', { cookie })).status, 401);
+        assert.equal((await f.request('/events/' + id + '/register', { method: 'POST', cookie })).status, 401);
+    }
+    assert.equal((await f.request('/login', { method: 'POST', body: { email: user.email, password: 'demo-password' } })).status, 403);
+    assert.equal((await f.request('/events/' + id + '/attendees', { method: 'POST', cookie: owner.cookie, body: { userId: user.id } })).status, 409);
+    assert.equal((await status(user, { status: 'active', reason: 'Review resolved' })).status, 200);
+    assert.equal((await f.request('/me', { cookie: user.cookie })).status, 401);
+    assert.equal((await f.request('/login', { method: 'POST', body: { email: user.email, password: 'demo-password' } })).status, 200);
+    assert.equal((await status(owner, { status: 'banned', reason: 'Organizer spam' })).status, 200);
+    assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: eventData })).status, 401);
+    assert.equal((await f.request('/events/' + id)).status, 200, 'Suspension retains events for review');
+});
+
+test('Admin manages other and ownerless events with reasons, audit records and cancellation notifications', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+    const id = await f.event(owner);
+    assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: admin.cookie, body: eventData })).status, 400);
+    assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: admin.cookie, body: { ...eventData, title: 'Reviewed', createdBy: admin.id, moderationReason: 'Correct title' } })).status, 200);
+    assert.equal((await f.request('/events/' + id)).data.createdBy, owner.id);
+    await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie });
+    assert.equal((await f.request('/events/' + id, { method: 'DELETE', cookie: admin.cookie, body: { moderationReason: 'Remove' } })).status, 409);
+    assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Inappropriate content' } })).status, 200);
+    assert.equal((await f.request('/notifications', { cookie: user.cookie })).data.notifications[0].message, 'Inappropriate content');
+    const empty = await f.event(owner);
+    await f.db.run('UPDATE events SET createdBy = NULL WHERE id = ?', [empty]);
+    assert.equal((await f.request('/events/' + empty, { method: 'DELETE', cookie: owner.cookie })).status, 403);
+    assert.equal((await f.request('/events/' + empty, { method: 'DELETE', cookie: admin.cookie, body: { moderationReason: 'Remove legacy spam' } })).status, 200);
+    const log = (await f.request('/admin/audit', { cookie: admin.cookie })).data;
+    assert.deepEqual(log.map(row => row.action), ['delete_event', 'cancel_event', 'edit_event', 'grant_admin']);
+    assert.equal(JSON.parse(log.find(row => row.action === 'edit_event').details).before.title, 'Workshop');
+    assert.equal(log[0].targetId, empty);
+    assert.equal(log[0].actorId, admin.id);
+});
+
+test('Audit failures roll back admin edits, cancellation notifications and bans without leaking transactions', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+    const id = await f.event(owner);
+    await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie });
+    await f.db.run("CREATE TRIGGER fail_audit BEFORE INSERT ON admin_audit BEGIN SELECT RAISE(ABORT, 'test audit failure'); END");
+    assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: admin.cookie, body: { ...eventData, title: 'Changed', moderationReason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/events/' + id)).data.title, 'Workshop');
+    assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/events/' + id)).data.status, 'active');
+    assert.equal((await f.request('/notifications', { cookie: user.cookie })).data.unreadCount, 0);
+    assert.equal((await f.request('/admin/users/' + user.id + '/status', { method: 'PUT', cookie: admin.cookie, body: { status: 'banned', reason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/me', { cookie: user.cookie })).status, 200);
+    await f.db.run('DROP TRIGGER fail_audit');
+    const concurrent = await Promise.all([
+        f.request('/admin/users/' + user.id + '/status', { method: 'PUT', cookie: admin.cookie, body: { status: 'banned', reason: 'Reviewed' } }),
+        f.request('/admin/users/' + user.id + '/status', { method: 'PUT', cookie: admin.cookie, body: { status: 'banned', reason: 'Duplicate' } }),
+    ]);
+    assert.deepEqual(concurrent.map(result => result.status).sort(), [200, 409]);
+    assert.equal((await f.request('/admin/audit', { cookie: admin.cookie })).data.filter(row => row.action === 'ban_user').length, 1);
 });

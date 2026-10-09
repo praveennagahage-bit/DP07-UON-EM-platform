@@ -44,7 +44,9 @@ If port 5173 is occupied, stop the conflicting development server or explicitly 
 - Duplicate registrations and over-capacity bookings are prevented at the database write, including concurrent requests.
 - Optional event images: JPEG, PNG or WebP, maximum 2 MiB and 16 million pixels. The backend validates and decodes the actual file, strips metadata and re-encodes it as WebP. Owners can replace/remove the image when editing.
 - Create/edit require a real future date and time in Australia/Sydney (Newcastle), including daylight-saving validation. Both self-registration and organizer registration close when an event starts.
-- Capacity must be a positive integer and cannot be reduced below the current registration count.
+- Shared frontend/backend validation: title 15 Unicode characters, description 500, location 120 with a venue/room name; capacity is an integer from 1 to 10000 and cannot be reduced below current bookings. Counts trim outer whitespace and include internal spaces and punctuation. HTML tags, script URLs and control characters are rejected; normal JavaScript course names remain valid. Legacy text is preserved until edited.
+- Profile: edit own first/last names and bio; email and role are read-only.
+- Admin: global event moderation, ordinary-account suspension/restoration, and an atomic audit log. Suspended accounts lose all sessions and cannot log in or receive new registrations. Organizer ownership restrictions remain unchanged.
 - Cancellation requires a reason, retains the event and registrations, and prevents new bookings and editing.
   Attendees see the cancellation reason in My Bookings and receive a personal notification. Existing bookings can still be removed.
 - A SQLite trigger creates one notification per current registration atomically with cancellation; a failed notification write rolls the cancellation back. Repeated cancellations do not duplicate notices.
@@ -54,20 +56,21 @@ If port 5173 is occupied, stop the conflicting development server or explicitly 
 
 ## Role policy and remaining work
 
-createdBy is enforced as ownership on every event management endpoint. It is assigned from the signed-in session and cannot be changed by request data. Legacy events without an owner remain viewable but cannot be claimed or managed through these endpoints.
+createdBy is enforced as ownership on every event management endpoint. It is assigned from the signed-in session and cannot be changed by request data. Legacy events without an owner remain viewable; only Admin can moderate them, without claiming or changing ownership.
 An organizer account is not an attendee account and cannot register itself as an attendee.
 
 **Coursework demo policy:** signup still allows the user to select Organizer. Server-side role checking does not make this an approved administrator provisioning process.
 Before a public launch, replace that selection with invitations or explicit administrator approval.
 
 The lecturer feedback areas (registration, participant administration, event search, cancellation reasons and in-app notifications) are implemented.
-Profile, subscription and homepage category-click placeholders remain outside this change. Notifications are in-app, not email or browser push.
+Profile and homepage category filtering are implemented. The subscription placeholder remains outside this change. Notifications are in-app, not email or browser push.
 
 ## Database and configuration
 
 By default the server opens users.db beside database.js. Startup performs an additive migration, keeping existing users and events and adding:
 - events.status (active by default), events.cancellationReason and events.image (optional image blob);
-- sessions, registrations and notifications, their indexes and integrity triggers.
+- sessions, registrations and notifications, their indexes and integrity triggers;
+- users.bio, users.status, users.banReason and admin_audit.
 
 Existing events with zero capacity are preserved, but cannot accept registrations until an organizer sets a positive capacity.
 Existing bcrypt accounts continue to work; users must sign in again after migrating from the old localStorage-only login.
@@ -89,11 +92,15 @@ Backend paths below are accessed by the frontend through the /api prefix.
 | --- | --- | --- |
 | POST | /register, /login | Public; demo role selection on signup |
 | GET | /me | Signed in |
+| PUT | /me/profile | Signed in; own firstName, lastName, bio only |
+| GET | /admin/users?q=... | Admin |
+| PUT | /admin/users/:id/status | Admin; status active/banned and reason |
+| GET | /admin/audit?before=... | Admin; cursor pagination, 50 records |
 | POST | /logout | Idempotent session invalidation |
 | GET | /events?q=..., /events/:id | Public; optional title/category/location search |
 | POST | /events | Organizer (event owner for existing events) |
-| PUT / DELETE | /events/:id | Organizer (event owner for existing events) |
-| POST | /events/:id/cancel | Event owner; JSON reason |
+| PUT / DELETE | /events/:id | Owner or Admin; Admin must supply moderationReason |
+| POST | /events/:id/cancel | Owner or Admin; JSON reason |
 | POST / DELETE | /events/:id/register | Attendee; identity from session |
 | GET | /me/registrations | Attendee; own bookings |
 | GET | /events/:id/attendees | Organizer (event owner for existing events) |
@@ -119,7 +126,19 @@ npm run build
 
 The integration tests create isolated databases and exercise real HTTP requests: session expiry/logout/rotation, forged identity,
 role restrictions, cross-organizer ownership enforcement, registration isolation, duplicates, concurrent last-seat booking, capacity changes,
-cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (19 integration tests). They do not modify the project users.db.
+cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (28 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
 
 Browser verification uses a separate temporary database and covers login/refresh/logout, attendee booking/cancellation,
 organizer editing and attendee management, cancellation visibility and protected routes. Additional browser checks cover search, empty results, unread badges, single/all-read actions, reload persistence and account isolation.
+
+## Administrator setup
+
+Register a dedicated account normally, then run from the repository root:
+
+```sh
+npm run admin:grant -- registered-email@example.com --confirm
+```
+
+Use the same DB_PATH as the backend. This changes the existing role and revokes sessions; sign in again. No default administrator credentials are supplied. Public registration and Profile cannot grant Admin. Admin cannot suspend other administrators. Moderation requires a reason; booked events must be cancelled with notifications, not permanently deleted. See [管理员与本轮 Demo 指南](docs/ADMIN_GUIDE.zh-CN.md).
+
+Mobile browser checks cover 360/390/430-pixel layouts; physical phone keyboard/touch validation remains a manual follow-up.

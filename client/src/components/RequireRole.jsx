@@ -5,6 +5,6 @@ export default function RequireRole({ role, children }) {
   const { user } = useAuth();
   const location = useLocation();
   if (!user) return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
-  if (user.role !== role) return <main className="page"><h1>Access restricted</h1><p>This page requires an {role} account.</p></main>;
+  if (role && !(Array.isArray(role) ? role : [role]).includes(user.role)) return <main className="page"><h1>Access restricted</h1><p>This page requires an {role} account.</p></main>;
   return children;
 }

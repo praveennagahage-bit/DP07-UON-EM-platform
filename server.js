@@ -1,5 +1,6 @@
 const { decodeEventImage } = require('./eventImage');
 const { eventTimestamp, isFutureEvent } = require('./shared/eventTime.mjs');
+const { eventInputErrors, profileInputErrors, textError } = require('./shared/validation.mjs');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
@@ -13,7 +14,7 @@ const text = value => typeof value === 'string' ? value.trim() : '';
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const publicUser = user => ({
     id: user.id, firstName: user.firstName, lastName: user.lastName,
-    email: user.email, role: user.role,
+    email: user.email, role: user.role, bio: user.bio || '',
 });
 
 function createApp(db, options = {}) {
@@ -39,7 +40,7 @@ function createApp(db, options = {}) {
             .find(part => part.startsWith(SESSION_COOKIE + '='))?.slice(SESSION_COOKIE.length + 1);
         req.sessionHash = /^[a-f0-9]{64}$/.test(token || '') ? hashToken(token) : null;
         req.user = req.sessionHash ? await db.get(
-            'SELECT users.* FROM sessions JOIN users ON users.id = sessions.userId WHERE tokenHash = ? AND expiresAt > ?',
+            "SELECT users.* FROM sessions JOIN users ON users.id = sessions.userId WHERE tokenHash = ? AND expiresAt > ? AND users.status = 'active'",
             [req.sessionHash, Date.now()]
         ) : null;
         next();
@@ -52,6 +53,12 @@ function createApp(db, options = {}) {
     };
     const organizer = requireRole('organizer');
     const attendee = requireRole('attendee');
+    const admin = requireRole('admin');
+    const eventManager = (req, res, next) => {
+        if (!req.user) return next(fail(401, 'Please sign in to continue'));
+        if (!['organizer', 'admin'].includes(req.user.role)) return next(fail(403, 'Organizer or administrator access required'));
+        next();
+    };
     app.param('id', (req, res, next, id) => {
         if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) return next(fail(400, 'Invalid event ID'));
         next();
@@ -63,7 +70,7 @@ function createApp(db, options = {}) {
     };
     const ownsEvent = async (req, res, next) => {
         const event = await eventExists(req.params.id);
-        if (event.createdBy !== req.user.id) throw fail(403, 'Only the organizer who created this event can manage it');
+        if (req.user.role !== 'admin' && event.createdBy !== req.user.id) throw fail(403, 'Only the organizer who created this event can manage it');
         req.event = event;
         next();
     };
@@ -80,18 +87,39 @@ function createApp(db, options = {}) {
         if (!title || !date || !time || !location) throw fail(400, 'Title, date, time and location are required');
         if (!Number.isFinite(eventTimestamp(date, time))) throw fail(400, 'Enter a valid date and time in Australia/Sydney (including daylight saving)');
         if (!isFutureEvent(date, time)) throw fail(400, 'Event date and time must be in the future (Australia/Sydney)');
-        if (title.length > 200 || text(body.description).length > 5000 || location.length > 300) throw fail(400, 'Event title, description or location is too long');
-        if (!Number.isSafeInteger(capacity) || capacity < 1) throw fail(400, 'Capacity must be a positive whole number');
+        const validation = eventInputErrors(body);
+        if (Object.keys(validation).length) throw fail(400, Object.values(validation)[0]);
         const category = text(body.category);
         if (!['Workshop', 'Seminar', 'Social', 'Sports'].includes(category)) throw fail(400, 'Select a valid category');
         return [title, text(body.description), date, time, location, category, capacity];
     }
+
+    function moderationReason(value) {
+        const error = textError(value, 'Management reason', 500, true);
+        if (error) throw fail(400, error);
+        return value.trim();
+    }
+    async function auditChange(req, action, targetType, targetId, reason, work) {
+        return db.transaction(async tx => {
+            const actor = await tx.get('SELECT role, status FROM users WHERE id = ?', [req.user.id]);
+            if (actor?.role !== 'admin' || actor.status !== 'active') throw fail(403, 'Administrator access required');
+            const result = await work(tx);
+            await tx.run('INSERT INTO admin_audit (actorId, action, targetType, targetId, reason, details) VALUES (?, ?, ?, ?, ?, ?)',
+                [req.user.id, action, targetType, Number(targetId), reason, JSON.stringify(result?.audit || {})]);
+            return result;
+        });
+    }
+    const manageEvent = (req, action, work) => req.user.role === 'admin'
+        ? auditChange(req, action, 'event', req.params.id, moderationReason(req.body.moderationReason || req.body.reason), work)
+        : work(db);
 
     app.get('/', (req, res) => res.send('Server is running!'));
 
     // USER REGISTER: role selection is retained for the coursework demo.
     app.post('/register', async (req, res) => {
         const firstName = text(req.body.firstName), lastName = text(req.body.lastName);
+        const nameErrors = profileInputErrors({ firstName, lastName, bio: '' });
+        if (Object.keys(nameErrors).length) throw fail(400, Object.values(nameErrors)[0]);
         const email = text(req.body.email).toLowerCase(), { role, password } = req.body;
         if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(400, 'Enter your name and a valid email address');
         if (!['attendee', 'organizer'].includes(role)) throw fail(400, 'Select a valid role');
@@ -113,6 +141,7 @@ function createApp(db, options = {}) {
         }
         const user = await db.get('SELECT * FROM users WHERE lower(trim(email)) = ?', [email]);
         if (!user || !await bcrypt.compare(password, user.password)) throw fail(401, 'Invalid email or password');
+        if (user.status !== 'active') throw fail(403, 'Your account is suspended. Contact the site administrator.');
         const token = randomBytes(32).toString('hex');
         await db.run('DELETE FROM sessions WHERE expiresAt <= ? OR tokenHash = ?', [Date.now(), req.sessionHash]);
         await db.run('INSERT INTO sessions (tokenHash, userId, expiresAt) VALUES (?, ?, ?)', [hashToken(token), user.id, Date.now() + SESSION_TTL]);
@@ -120,6 +149,15 @@ function createApp(db, options = {}) {
         res.json({ user: publicUser(user) });
     });
     app.get('/me', requireUser, (req, res) => res.json({ user: publicUser(req.user) }));
+    app.put('/me/profile', requireUser, async (req, res) => {
+        if (Object.keys(req.body).some(key => !['firstName', 'lastName', 'bio'].includes(key))) throw fail(400, 'Only first name, last name and bio can be updated here');
+        const errors = profileInputErrors(req.body);
+        if (Object.keys(errors).length) throw fail(400, Object.values(errors)[0]);
+        const result = await db.run("UPDATE users SET firstName = ?, lastName = ?, bio = ? WHERE id = ? AND status = 'active'",
+            [text(req.body.firstName), text(req.body.lastName), text(req.body.bio), req.user.id]);
+        if (!result.changes) throw fail(401, 'Please sign in to continue');
+        res.json({ user: publicUser(await db.get('SELECT * FROM users WHERE id = ?', [req.user.id])) });
+    });
     app.post('/logout', async (req, res) => {
         if (req.sessionHash) await db.run('DELETE FROM sessions WHERE tokenHash = ?', [req.sessionHash]);
         res.clearCookie(SESSION_COOKIE, cookieOptions);
@@ -156,27 +194,37 @@ function createApp(db, options = {}) {
             [...values, req.user.id, image || null]);
         res.status(201).json({ message: 'Event created successfully', eventId: result.id });
     });
-    app.put('/events/:id', organizer, ownsEvent, async (req, res) => {
+    app.put('/events/:id', eventManager, ownsEvent, async (req, res) => {
         const values = eventValues(req.body);
         const image = await decodeEventImage(req.body.image);
-        const result = await db.run(`UPDATE events SET title = ?, description = ?, date = ?, time = ?, location = ?, category = ?, capacity = ?, image = CASE WHEN ? THEN ? ELSE image END
+        await manageEvent(req, 'edit_event', async tx => {
+        const before = await tx.get('SELECT title, description, date, time, location, category, capacity FROM events WHERE id = ?', [req.params.id]);
+        const result = await tx.run(`UPDATE events SET title = ?, description = ?, date = ?, time = ?, location = ?, category = ?, capacity = ?, image = CASE WHEN ? THEN ? ELSE image END
             WHERE id = ? AND status = 'active'`, [...values, image !== undefined ? 1 : 0, image || null, req.params.id]);
         if (!result.changes) throw fail(409, 'Cancelled events cannot be edited');
+        return { audit: { before, after: { title: values[0], description: values[1], date: values[2], time: values[3], location: values[4], category: values[5], capacity: values[6] }, imageChanged: image !== undefined } };
+        });
         res.json({ message: 'Event updated successfully' });
     });
-    app.post('/events/:id/cancel', organizer, ownsEvent, async (req, res) => {
+    app.post('/events/:id/cancel', eventManager, ownsEvent, async (req, res) => {
         const reason = text(req.body.reason);
         if (!reason || reason.length > 2000) throw fail(400, 'A cancellation reason of 1–2000 characters is required');
         await eventExists(req.params.id);
-        const result = await db.run("UPDATE events SET status = 'cancelled', cancellationReason = ? WHERE id = ? AND status = 'active'", [reason, req.params.id]);
+        await manageEvent(req, 'cancel_event', async tx => {
+        const result = await tx.run("UPDATE events SET status = 'cancelled', cancellationReason = ? WHERE id = ? AND status = 'active'", [reason, req.params.id]);
         if (!result.changes) throw fail(409, 'Event is already cancelled');
+        return { audit: { title: req.event.title } };
+        });
         res.json({ message: 'Event cancelled. Notifications have been sent to registered attendees.' });
     });
     // Keep the existing delete API, but preserve events with booking history.
-    app.delete('/events/:id', organizer, ownsEvent, async (req, res) => {
+    app.delete('/events/:id', eventManager, ownsEvent, async (req, res) => {
         await eventExists(req.params.id);
-        const result = await db.run('DELETE FROM events WHERE id = ? AND NOT EXISTS (SELECT 1 FROM registrations WHERE eventId = events.id)', [req.params.id]);
+        await manageEvent(req, 'delete_event', async tx => {
+        const result = await tx.run('DELETE FROM events WHERE id = ? AND NOT EXISTS (SELECT 1 FROM registrations WHERE eventId = events.id)', [req.params.id]);
         if (!result.changes) throw fail(409, 'This event has registrations. Cancel it instead.');
+        return { audit: { title: req.event.title, createdBy: req.event.createdBy } };
+        });
         res.json({ message: 'Event deleted successfully' });
     });
 
@@ -212,7 +260,7 @@ function createApp(db, options = {}) {
     app.get('/attendees', organizer, async (req, res) => {
         const query = text(req.query.q);
         if (query.length < 2) return res.json([]);
-        res.json(await db.all(`SELECT id, firstName, lastName, email FROM users WHERE role = 'attendee'
+        res.json(await db.all(`SELECT id, firstName, lastName, email FROM users WHERE role = 'attendee' AND status = 'active'
             AND (instr(lower(firstName || ' ' || lastName), lower(?)) > 0 OR instr(lower(email), lower(?)) > 0)
             ORDER BY firstName, lastName, id LIMIT 30`, [query, query]));
     });
@@ -225,6 +273,31 @@ function createApp(db, options = {}) {
         if (!/^[1-9]\d*$/.test(req.params.userId)) throw fail(400, 'Invalid attendee ID');
         await unregister(req.params.id, Number(req.params.userId));
         res.json({ message: 'Attendee removed' });
+    });
+
+    app.get('/admin/users', admin, async (req, res) => {
+        const q = text(req.query.q);
+        res.json(await db.all(`SELECT id, firstName, lastName, email, role, status, banReason FROM users
+            WHERE instr(lower(firstName || ' ' || lastName || ' ' || email), lower(?)) > 0 ORDER BY id DESC`, [q]));
+    });
+    app.put('/admin/users/:id/status', admin, async (req, res) => {
+        if (!['active', 'banned'].includes(req.body.status)) throw fail(400, 'Select active or banned');
+        const reason = moderationReason(req.body.reason);
+        await auditChange(req, req.body.status === 'banned' ? 'ban_user' : 'unban_user', 'user', req.params.id, reason, async tx => {
+            const target = await tx.get('SELECT id, role, status FROM users WHERE id = ?', [req.params.id]);
+            if (!target) throw fail(404, 'User not found');
+            if (target.role === 'admin' || target.id === req.user.id) throw fail(403, 'Administrator accounts cannot be suspended here');
+            if (target.status === req.body.status) throw fail(409, 'Account already has this status');
+            await tx.run('UPDATE users SET status = ?, banReason = ? WHERE id = ?', [req.body.status, req.body.status === 'banned' ? reason : '', target.id]);
+            return { audit: { from: target.status, to: req.body.status } };
+        });
+        res.json({ message: req.body.status === 'banned' ? 'Account suspended and existing sessions revoked.' : 'Account restored. The user must sign in again.' });
+    });
+    app.get('/admin/audit', admin, async (req, res) => {
+        const before = req.query.before === undefined ? Number.MAX_SAFE_INTEGER : Number(req.query.before);
+        if (!Number.isSafeInteger(before) || before < 1) throw fail(400, 'Invalid audit cursor');
+        res.json(await db.all(`SELECT admin_audit.*, users.firstName, users.lastName FROM admin_audit
+            JOIN users ON users.id = actorId WHERE admin_audit.id < ? ORDER BY admin_audit.id DESC LIMIT 50`, [before]));
     });
 
     // Notification ownership always comes from the authenticated session.
@@ -247,7 +320,7 @@ function createApp(db, options = {}) {
     app.use((req, res) => res.status(404).json({ message: 'Endpoint not found' }));
     app.use((error, req, res, next) => { // Express error middleware requires four arguments.
         if (res.headersSent) return next(error);
-        const rule = ['Event not found', 'Attendee not found', 'Event is cancelled', 'Already registered',
+        const rule = ['Event not found', 'Attendee not found', 'Account is suspended', 'Event is cancelled', 'Already registered',
             'Event is full', 'Capacity cannot be below the registered count'].find(message => error.message.includes(message));
         if (rule) return res.status(rule.endsWith('not found') ? 404 : 409).json({ message: rule });
         if (error.message.includes('UNIQUE constraint failed: users.email')) return res.status(409).json({ message: 'Email already exists' });

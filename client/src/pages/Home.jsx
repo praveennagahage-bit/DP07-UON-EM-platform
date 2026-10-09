@@ -106,7 +106,7 @@ function Home() {
   };
 
   return (
-    <div
+    <div className="home-page"
       style={{
         minHeight: "calc(100vh - 60px)",
         background: "#1d1d1d",
@@ -114,7 +114,7 @@ function Home() {
         padding: "30px",
       }}
     >
-      <div
+      <div className="home-layout"
         style={{
           maxWidth: "1600px",
           margin: "0 auto",
@@ -127,12 +127,12 @@ function Home() {
             LEFT SIDE
         ====================================================== */}
 
-        <div style={{ flex: 3, minWidth: 0 }}>
+        <div className="home-main" style={{ flex: 3, minWidth: 0 }}>
           {/* =====================================================
               HERO SECTION
           ====================================================== */}
 
-          <div
+          <div className="home-hero"
             style={{
               background:
                 "linear-gradient(135deg, #064e43 0%, #033b34 100%)",
@@ -204,7 +204,7 @@ function Home() {
                   BIG SEARCH BAR
               ====================================================== */}
 
-              <form
+              <form className="home-search"
                 onSubmit={handleSearch}
                 style={{
                   marginTop: "28px",
@@ -583,7 +583,7 @@ function Home() {
               EVENT CARDS
           ====================================================== */}
 
-          <div
+          <div className="home-event-grid"
             style={{
               display: "flex",
               gap: "18px",
@@ -591,7 +591,7 @@ function Home() {
             }}
           >
             {upcomingEvents.map((event) => (
-              <div
+              <div className="home-event-card"
                 key={event.id}
                 style={{
                   background: "#0b0b0b",
@@ -615,7 +615,7 @@ function Home() {
                   }}
                 />
 
-                <div
+                <div className="home-card-body"
                   style={{
                     padding: "18px",
                   }}
@@ -636,7 +636,7 @@ function Home() {
 
                   {/* TITLE */}
 
-                  <h3
+                  <h3 className="home-card-title" title={event.title}
                     style={{
                       margin: "0 0 15px",
                       color: "#ffffff",
@@ -672,7 +672,7 @@ function Home() {
 
                   {/* LOCATION */}
 
-                  <p
+                  <p className="home-card-location" title={event.location}
                     style={{
                       margin: "6px 0",
                       color: "#bdbdbd",
@@ -712,7 +712,7 @@ function Home() {
             RIGHT SIDE
         ====================================================== */}
 
-        <div
+        <div className="home-sidebar"
           style={{
             flex: 1,
             minWidth: "280px",

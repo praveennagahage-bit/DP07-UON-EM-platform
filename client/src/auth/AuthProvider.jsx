@@ -41,7 +41,11 @@ export default function AuthProvider({ children }) {
     await api('/logout', { method: 'POST' });
     setUser(null);
   }
+  async function updateProfile(form) {
+    const data = await api('/me/profile', { method: 'PUT', body: JSON.stringify(form) });
+    setUser(data.user);
+  }
   if (loading) return <main className="page"><p role="status">Checking your session…</p></main>;
   if (error) return <main className="page"><p role="alert">{error}</p><button onClick={() => window.location.reload()}>Retry</button></main>;
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, login, logout, updateProfile }}>{children}</AuthContext.Provider>;
 }

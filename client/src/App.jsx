@@ -1,3 +1,5 @@
+import Profile from './pages/Profile';
+import Admin from './pages/Admin';
 import NotificationsProvider from './notifications/NotificationsProvider';
 import Notifications from './pages/Notifications';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -16,10 +18,12 @@ export default function App() {
     <Route path="/" element={<Home />} />
     <Route path="/events" element={<Events />} />
     <Route path="/events/:id" element={<EventDetails />} />
-    <Route path="/events/:id/edit" element={<RequireRole role="organizer"><EditEvent /></RequireRole>} />
+    <Route path="/events/:id/edit" element={<RequireRole role={['organizer', 'admin']}><EditEvent /></RequireRole>} />
     <Route path="/create" element={<RequireRole role="organizer"><CreateEvent /></RequireRole>} />
     <Route path="/bookings" element={<RequireRole role="attendee"><Events key="bookings" bookings /></RequireRole>} />
     <Route path="/notifications" element={<Notifications />} />
+    <Route path="/profile" element={<RequireRole><Profile /></RequireRole>} />
+    <Route path="/admin" element={<RequireRole role="admin"><Admin /></RequireRole>} />
     <Route path="/auth" element={<AuthPage />} />
     <Route path="*" element={<main className="page"><h1>Page not found</h1></main>} />
   </Routes></NotificationsProvider></AuthProvider></BrowserRouter>;
