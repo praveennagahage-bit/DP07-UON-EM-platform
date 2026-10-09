@@ -1,4 +1,4 @@
-export const LIMITS = { title: 15, description: 500, location: 120, capacity: 10000, name: 50, bio: 300 };
+export const LIMITS = { title: 30, description: 500, location: 120, capacity: 10000, name: 50, bio: 300 };
 export const characterCount = value => Array.from(value || '').length;
 export const cleanText = value => typeof value === 'string' ? value.trim() : '';
 // Plain-text validation supplements React text rendering and parameterized SQL.

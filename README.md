@@ -44,7 +44,7 @@ If port 5173 is occupied, stop the conflicting development server or explicitly 
 - Duplicate registrations and over-capacity bookings are prevented at the database write, including concurrent requests.
 - Optional event images: JPEG, PNG or WebP, maximum 2 MiB and 16 million pixels. The backend validates and decodes the actual file, strips metadata and re-encodes it as WebP. Owners can replace/remove the image when editing.
 - Create/edit require a real future date and time in Australia/Sydney (Newcastle), including daylight-saving validation. Both self-registration and organizer registration close when an event starts.
-- Shared frontend/backend validation: title 15 Unicode characters, description 500, location 120 with a venue/room name; capacity is an integer from 1 to 10000 and cannot be reduced below current bookings. Counts trim outer whitespace and include internal spaces and punctuation. HTML tags, script URLs and control characters are rejected; normal JavaScript course names remain valid. Legacy text is preserved until edited.
+- Shared frontend/backend validation: title 30 Unicode characters, description 500, location 120 with a venue/room name; capacity is an integer from 1 to 10000 and cannot be reduced below current bookings. Counts trim outer whitespace and include internal spaces and punctuation. HTML tags, script URLs and control characters are rejected; normal JavaScript course names remain valid. Legacy text is preserved until edited.
 - Profile: edit own first/last names and bio; email and role are read-only.
 - Admin: global event moderation, ordinary-account suspension/restoration, and an atomic audit log. Suspended accounts lose all sessions and cannot log in or receive new registrations. Organizer ownership restrictions remain unchanged.
 - Cancellation requires a reason, retains the event and registrations, and prevents new bookings and editing.
@@ -126,7 +126,7 @@ npm run build
 
 The integration tests create isolated databases and exercise real HTTP requests: session expiry/logout/rotation, forged identity,
 role restrictions, cross-organizer ownership enforcement, registration isolation, duplicates, concurrent last-seat booking, capacity changes,
-cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (28 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
+cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (30 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
 
 Browser verification uses a separate temporary database and covers login/refresh/logout, attendee booking/cancellation,
 organizer editing and attendee management, cancellation visibility and protected routes. Additional browser checks cover search, empty results, unread badges, single/all-read actions, reload persistence and account isolation.

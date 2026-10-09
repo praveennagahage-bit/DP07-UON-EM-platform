@@ -104,8 +104,29 @@ function createApp(db, options = {}) {
             const actor = await tx.get('SELECT role, status FROM users WHERE id = ?', [req.user.id]);
             if (actor?.role !== 'admin' || actor.status !== 'active') throw fail(403, 'Administrator access required');
             const result = await work(tx);
-            await tx.run('INSERT INTO admin_audit (actorId, action, targetType, targetId, reason, details) VALUES (?, ?, ?, ?, ?, ?)',
+            const auditRecord = await tx.run('INSERT INTO admin_audit (actorId, action, targetType, targetId, reason, details) VALUES (?, ?, ?, ?, ?, ?)',
                 [req.user.id, action, targetType, Number(targetId), reason, JSON.stringify(result?.audit || {})]);
+            // Notify only the event owner, in the same transaction as moderation.
+            // Each edit has its own audit ID so repeated edits retain separate notices.
+            if (targetType === 'event' && req.event.createdBy) {
+                const deleted = action === 'delete_event';
+                const cancelled = action === 'cancel_event';
+                const type = cancelled ? 'event_cancelled' : (deleted ? 'event_deleted:' : 'event_updated:') + auditRecord.id;
+                const changes = [];
+                const labels = { title: 'Title', description: 'Description', date: 'Date', time: 'Time (Australia/Sydney)', location: 'Location', category: 'Category', capacity: 'Capacity' };
+                for (const [key, label] of Object.entries(labels)) {
+                    if (action === 'edit_event' && result.audit.before[key] !== result.audit.after[key]) {
+                        changes.push(label + ': ' + (result.audit.before[key] ?? '') + ' → ' + result.audit.after[key]);
+                    }
+                }
+                if (result?.audit?.imageChanged) changes.push('Image: replaced or removed');
+                const message = reason + (action === 'edit_event' ? '\n\nChanges:\n' + (changes.length ? changes.join('\n') : 'No text or image changes.') : '');
+                await tx.run(`INSERT INTO notifications (userId, eventId, type, eventTitle, message)
+                    SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS
+                    (SELECT 1 FROM notifications WHERE userId = ? AND eventId = ? AND type = ?)`,
+                    [req.event.createdBy, deleted ? null : Number(targetId), type, result?.audit?.after?.title || req.event.title, message,
+                        req.event.createdBy, Number(targetId), type]);
+            }
             return result;
         });
     }

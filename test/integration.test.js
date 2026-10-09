@@ -418,10 +418,10 @@ async function administrator(f) {
 test('Text limits count Unicode characters, preserve plain text and reject invalid event data on create/edit', async t => {
     const f = await fixture(t), owner = await f.account('organizer');
     const id = await f.event(owner);
-    const valid = { ...eventData, title: '学'.repeat(15), description: '学'.repeat(500), location: 'Room 201', capacity: 10000 };
+    const valid = { ...eventData, title: '学'.repeat(30), description: '学'.repeat(500), location: 'Room 201', capacity: 10000 };
     assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: valid })).status, 201);
     for (const change of [
-        { title: 'a'.repeat(16) }, { title: '   ' }, { title: '!!!' },
+        { title: 'a'.repeat(31) }, { title: '   ' }, { title: '!!!' },
         { description: 'a'.repeat(501) }, { description: '<script>alert(1)</script>' },
         { description: 'javascript:alert(1)' }, { description: 'bad\u0000text' },
         { location: '123' }, { location: '   ' }, { location: 'a'.repeat(121) },
@@ -536,4 +536,52 @@ test('Audit failures roll back admin edits, cancellation notifications and bans 
     ]);
     assert.deepEqual(concurrent.map(result => result.status).sort(), [200, 409]);
     assert.equal((await f.request('/admin/audit', { cookie: admin.cookie })).data.filter(row => row.action === 'ban_user').length, 1);
+});
+
+test('Admin moderation notifies only the owner; repeated edits persist and deletion retains snapshots', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), other = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+    const id = await f.event(owner);
+    const notices = async who => (await f.request('/notifications', { cookie: who.cookie })).data;
+    for (const title of ['First review', 'Second review']) {
+        assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: admin.cookie, body: { ...eventData, title, moderationReason: 'Correct wording' } })).status, 200);
+    }
+    let inbox = await notices(owner);
+    assert.equal(inbox.unreadCount, 2);
+    assert.match(inbox.notifications[0].message, /Correct wording/);
+    assert.match(inbox.notifications[0].message, /First review → Second review/);
+    assert.equal((await notices(other)).notifications.length, 0);
+    assert.equal((await notices(user)).notifications.length, 0);
+    assert.equal((await f.request('/notifications/' + inbox.notifications[0].id + '/read', { method: 'POST', cookie: other.cookie })).status, 404);
+    assert.equal((await f.request('/notifications/' + inbox.notifications[0].id + '/read', { method: 'POST', cookie: owner.cookie })).status, 200);
+    assert.equal((await notices(owner)).unreadCount, 1);
+    assert.equal((await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie })).status, 201);
+    assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Safety review' } })).status, 200);
+    assert.equal((await notices(owner)).notifications.filter(n => n.type === 'event_cancelled').length, 1);
+    assert.equal((await notices(user)).notifications[0].message, 'Safety review');
+    assert.equal((await notices(other)).notifications.length, 0);
+    assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Repeated' } })).status, 409);
+    const empty = await f.event(owner);
+    assert.equal((await f.request('/events/' + empty, { method: 'DELETE', cookie: admin.cookie, body: { moderationReason: 'Remove duplicate' } })).status, 200);
+    inbox = await notices(owner);
+    assert.equal(inbox.notifications[0].eventId, null);
+    assert.equal(inbox.notifications[0].eventTitle, 'Workshop');
+    assert.equal(inbox.notifications[0].message, 'Remove duplicate');
+    assert.ok(inbox.notifications[0].type.startsWith('event_deleted:'));
+});
+
+test('Owner notification failures roll back admin changes, audit and attendee cancellation notices', async t => {
+    const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+    const id = await f.event(owner);
+    await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie });
+    await f.db.run("CREATE TRIGGER fail_owner_notice BEFORE INSERT ON notifications WHEN NEW.userId = " + owner.id + " BEGIN SELECT RAISE(ABORT, 'test owner notice failure'); END");
+    const initial = (await f.request('/admin/audit', { cookie: admin.cookie })).data.length;
+    assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: admin.cookie, body: { ...eventData, title: 'Changed', moderationReason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/events/' + id)).data.title, 'Workshop');
+    assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/events/' + id)).data.status, 'active');
+    assert.equal((await f.db.get('SELECT count(*) AS n FROM notifications')).n, 0);
+    const empty = await f.event(owner);
+    assert.equal((await f.request('/events/' + empty, { method: 'DELETE', cookie: admin.cookie, body: { moderationReason: 'Review' } })).status, 500);
+    assert.equal((await f.request('/events/' + empty)).status, 200);
+    assert.equal((await f.request('/admin/audit', { cookie: admin.cookie })).data.length, initial);
 });
