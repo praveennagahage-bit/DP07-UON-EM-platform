@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../api';
 import RegistrationButton from '../components/RegistrationButton';
+import { isFutureEvent } from '../../../shared/eventTime.mjs';
 import AttendeeManager from '../components/AttendeeManager';
 
 export default function EventDetails() {
@@ -27,6 +28,15 @@ export default function EventDetails() {
     setBusy(true); setActionError('');
     try {
       await api(endpoint + '/cancel', { method: 'POST', body: JSON.stringify({ reason }) });
+      await reload();
+    } catch (err) { setActionError(err.message); }
+    finally { setBusy(false); }
+  }
+  async function restore() {
+    setBusy(true); setActionError('');
+    try {
+      await api(endpoint + '/restore', { method: 'POST', body: JSON.stringify({ reason }) });
+      setReason('');
       await reload();
     } catch (err) { setActionError(err.message); }
     finally { setBusy(false); }
@@ -68,6 +78,11 @@ export default function EventDetails() {
         </form>}
         {user.role === 'admin' && event.status !== 'active' && <label>Management reason<textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={500} required /></label>}
         {user.role === 'admin' && <p className="muted">Administrative edits, cancellations and deletions are recorded. A reason is required.</p>}
+        {user.role === 'admin' && event.status === 'cancelled' && <div>
+          <p className="muted">Restore this event and reopen registration. Existing bookings are retained. The creator and registered attendees will be notified.</p>
+          {!isFutureEvent(event.date, event.time) && <p className="muted">Past or started events cannot be restored.</p>}
+          <button className="action" disabled={busy || !reason.trim() || !isFutureEvent(event.date, event.time)} onClick={restore}>Restore Event</button>
+        </div>}
         <hr /><p className="muted">Only events with no registrations can be permanently deleted.</p>
         <button className="action secondary" disabled={busy || event.registeredCount > 0 || (user.role === 'admin' && !reason.trim())} onClick={remove}>Delete Event</button>
       </section>

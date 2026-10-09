@@ -126,7 +126,7 @@ npm run build
 
 The integration tests create isolated databases and exercise real HTTP requests: session expiry/logout/rotation, forged identity,
 role restrictions, cross-organizer ownership enforcement, registration isolation, duplicates, concurrent last-seat booking, capacity changes,
-cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (30 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
+cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (31 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
 
 Browser verification uses a separate temporary database and covers login/refresh/logout, attendee booking/cancellation,
 organizer editing and attendee management, cancellation visibility and protected routes. Additional browser checks cover search, empty results, unread badges, single/all-read actions, reload persistence and account isolation.

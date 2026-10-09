@@ -111,7 +111,7 @@ function createApp(db, options = {}) {
             if (targetType === 'event' && req.event.createdBy) {
                 const deleted = action === 'delete_event';
                 const cancelled = action === 'cancel_event';
-                const type = cancelled ? 'event_cancelled' : (deleted ? 'event_deleted:' : 'event_updated:') + auditRecord.id;
+                const type = cancelled ? (result.audit.cancellationVersion ? 'event_cancelled:' + result.audit.cancellationVersion : 'event_cancelled') : (deleted ? 'event_deleted:' : action === 'restore_event' ? 'event_restored:' : 'event_updated:') + auditRecord.id;
                 const changes = [];
                 const labels = { title: 'Title', description: 'Description', date: 'Date', time: 'Time (Australia/Sydney)', location: 'Location', category: 'Category', capacity: 'Capacity' };
                 for (const [key, label] of Object.entries(labels)) {
@@ -126,6 +126,11 @@ function createApp(db, options = {}) {
                     (SELECT 1 FROM notifications WHERE userId = ? AND eventId = ? AND type = ?)`,
                     [req.event.createdBy, deleted ? null : Number(targetId), type, result?.audit?.after?.title || req.event.title, message,
                         req.event.createdBy, Number(targetId), type]);
+            }
+            if (action === 'restore_event') {
+                await tx.run(`INSERT INTO notifications (userId, eventId, type, eventTitle, message)
+                    SELECT userId, eventId, ?, ?, ? FROM registrations WHERE eventId = ? AND userId != ?`,
+                    ['event_restored:' + auditRecord.id, req.event.title, reason, targetId, req.event.createdBy || 0]);
             }
             return result;
         });
@@ -234,9 +239,22 @@ function createApp(db, options = {}) {
         await manageEvent(req, 'cancel_event', async tx => {
         const result = await tx.run("UPDATE events SET status = 'cancelled', cancellationReason = ? WHERE id = ? AND status = 'active'", [reason, req.params.id]);
         if (!result.changes) throw fail(409, 'Event is already cancelled');
-        return { audit: { title: req.event.title } };
+        const current = await tx.get('SELECT cancellationVersion FROM events WHERE id = ?', [req.params.id]);
+        return { audit: { title: req.event.title, cancellationVersion: current.cancellationVersion } };
         });
         res.json({ message: 'Event cancelled. Notifications have been sent to registered attendees.' });
+    });
+    app.post('/events/:id/restore', admin, ownsEvent, async (req, res) => {
+        const reason = moderationReason(req.body.reason);
+        await auditChange(req, 'restore_event', 'event', req.params.id, reason, async tx => {
+            const current = await tx.get('SELECT * FROM events WHERE id = ?', [req.params.id]);
+            if (!current) throw fail(404, 'Event not found');
+            if (current.status !== 'cancelled') throw fail(409, 'Only cancelled events can be restored');
+            if (!isFutureEvent(current.date, current.time)) throw fail(409, 'Past or started events cannot be restored');
+            await tx.run("UPDATE events SET status = 'active', cancellationReason = '', cancellationVersion = cancellationVersion + 1 WHERE id = ?", [current.id]);
+            return { audit: { title: current.title, previousCancellationReason: current.cancellationReason } };
+        });
+        res.json({ message: 'Event restored. The creator and registered attendees have been notified.' });
     });
     // Keep the existing delete API, but preserve events with booking history.
     app.delete('/events/:id', eventManager, ownsEvent, async (req, res) => {

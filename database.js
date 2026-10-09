@@ -77,6 +77,7 @@ async function createDatabase(filename = process.env.DB_PATH || path.join(__dirn
             BEFORE UPDATE OF capacity ON events
             WHEN NEW.capacity < (SELECT COUNT(*) FROM registrations WHERE eventId = NEW.id)
             BEGIN SELECT RAISE(ABORT, 'Capacity cannot be below the registered count'); END;`);
+        if (!columns.some(column => column.name === 'cancellationVersion')) await run('ALTER TABLE events ADD COLUMN cancellationVersion INTEGER NOT NULL DEFAULT 0');
         // A cancellation and its notifications are one atomic SQLite statement.
         await exec(`CREATE TABLE IF NOT EXISTS notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,12 +91,13 @@ async function createDatabase(filename = process.env.DB_PATH || path.join(__dirn
                 UNIQUE(userId, eventId, type)
             );
             CREATE INDEX IF NOT EXISTS notifications_user ON notifications(userId, isRead, id);
-            CREATE TRIGGER IF NOT EXISTS notify_event_cancellation
+            DROP TRIGGER IF EXISTS notify_event_cancellation;
+            CREATE TRIGGER notify_event_cancellation
             AFTER UPDATE OF status ON events
             WHEN OLD.status = 'active' AND NEW.status = 'cancelled'
             BEGIN
-                INSERT INTO notifications (userId, eventId, eventTitle, message)
-                SELECT userId, NEW.id, NEW.title, NEW.cancellationReason
+                INSERT INTO notifications (userId, eventId, type, eventTitle, message)
+                SELECT userId, NEW.id, CASE WHEN NEW.cancellationVersion = 0 THEN 'event_cancelled' ELSE 'event_cancelled:' || NEW.cancellationVersion END, NEW.title, NEW.cancellationReason
                 FROM registrations WHERE eventId = NEW.id;
             END;`);
         const userColumns = await all('PRAGMA table_info(users)');

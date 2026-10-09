@@ -585,3 +585,39 @@ test('Owner notification failures roll back admin changes, audit and attendee ca
     assert.equal((await f.request('/events/' + empty)).status, 200);
     assert.equal((await f.request('/admin/audit', { cookie: admin.cookie })).data.length, initial);
 });
+
+test('Only admins restore future cancelled events; retain bookings and notify every cancellation cycle', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+ const id = await f.event(owner);
+ await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie });
+ const restore = (cookie, reason = 'Resolved') => f.request('/events/' + id + '/restore', { method: 'POST', cookie, body: { reason } });
+ assert.equal((await restore()).status, 401);
+ assert.equal((await restore(owner.cookie)).status, 403);
+ assert.equal((await restore(user.cookie)).status, 403);
+ assert.equal((await restore(admin.cookie)).status, 409);
+ for (let cycle = 0; cycle < 2; cycle++) {
+   assert.equal((await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Review ' + cycle } })).status, 200);
+   assert.equal((await restore(admin.cookie, '')).status, 400);
+   const results = await Promise.all([restore(admin.cookie), restore(admin.cookie)]);
+   assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+   const event = (await f.request('/events/' + id)).data;
+   assert.equal(event.status, 'active');
+   assert.equal(event.cancellationReason, '');
+   assert.equal(event.registeredCount, 1);
+ }
+ for (const who of [owner, user]) {
+   const notices = (await f.request('/notifications', { cookie: who.cookie })).data.notifications;
+   assert.equal(notices.filter(n => n.type.startsWith('event_cancelled')).length, 2);
+   assert.equal(notices.filter(n => n.type.startsWith('event_restored:')).length, 2);
+ }
+ await f.request('/events/' + id + '/cancel', { method: 'POST', cookie: admin.cookie, body: { reason: 'Review' } });
+ await f.db.run("UPDATE events SET date = '2000-01-01' WHERE id = ?", [id]);
+ assert.equal((await restore(admin.cookie)).status, 409);
+ await f.db.run("UPDATE events SET date = '2099-12-20' WHERE id = ?", [id]);
+ const before = (await f.db.get('SELECT count(*) AS n FROM notifications')).n;
+ await f.db.run("CREATE TRIGGER fail_restore BEFORE INSERT ON notifications WHEN NEW.type LIKE 'event_restored:%' BEGIN SELECT RAISE(ABORT, 'test restore failure'); END");
+ assert.equal((await restore(admin.cookie)).status, 500);
+ assert.equal((await f.request('/events/' + id)).data.status, 'cancelled');
+ assert.equal((await f.db.get('SELECT count(*) AS n FROM notifications')).n, before);
+ assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'restore_event'")).n, 2);
+});

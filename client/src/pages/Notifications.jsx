@@ -39,9 +39,9 @@ function NotificationList() {
     {actionError && <p className="error" role="alert">{actionError}</p>}
     {!loading && !error && !shown.length && <section className="panel"><p>{unreadOnly ? 'You have no unread notifications.' : 'No notifications yet.'}</p></section>}
     <div className="notification-list">{shown.map(item => <article key={item.id} className={'panel notification-item' + (!item.isRead ? ' unread' : '')}>
-      <div className="page-heading"><span className="eyebrow">{item.type.startsWith('event_updated:') ? 'Event Updated by Admin' : item.type.startsWith('event_deleted:') ? 'Event Deleted by Admin' : 'Event Cancelled'}</span><span className="muted">{item.isRead ? 'Read' : 'Unread'}</span></div>
+      <div className="page-heading"><span className="eyebrow">{item.type.startsWith('event_restored:') ? 'Event Restored by Admin' : item.type.startsWith('event_updated:') ? 'Event Updated by Admin' : item.type.startsWith('event_deleted:') ? 'Event Deleted by Admin' : 'Event Cancelled'}</span><span className="muted">{item.isRead ? 'Read' : 'Unread'}</span></div>
       <h2>{item.eventTitle}</h2>
-      <p>{item.type.startsWith('event_updated:') ? 'An administrator has edited your event.' : item.type.startsWith('event_deleted:') ? 'An administrator has permanently deleted your event.' : 'This event has been cancelled.'}</p>
+      <p>{item.type.startsWith('event_restored:') ? 'An administrator has restored this event. Existing bookings are still valid.' : item.type.startsWith('event_updated:') ? 'An administrator has edited your event.' : item.type.startsWith('event_deleted:') ? 'An administrator has permanently deleted your event.' : 'This event has been cancelled.'}</p>
       <p className="cancellation" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>Reason: {item.message}</p>
       <time className="muted" dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
       <div className="actions notification-actions">
