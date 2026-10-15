@@ -254,15 +254,16 @@ test('Cancellation notifies current self/admin registrations, excludes removed a
     for (const user of [alice, bob]) {
         const result = await request('/notifications', { cookie: user.cookie });
         assert.equal(result.status, 200);
-        assert.equal(result.data.unreadCount, 1);
-        assert.equal(result.data.notifications.length, 1);
-        const notification = result.data.notifications[0];
+        const expected = user.id === bob.id ? 2 : 1;
+        assert.equal(result.data.unreadCount, expected);
+        assert.equal(result.data.notifications.filter(n => n.type === 'event_cancelled').length, 1);
+        const notification = result.data.notifications.find(n => n.type === 'event_cancelled');
         assert.equal(notification.eventId, id);
         assert.equal(notification.eventTitle, 'Cancelled lab');
         assert.equal(notification.message, 'Presenter unavailable');
         assert.equal(notification.isRead, 0);
         assert.ok(Number.isFinite(Date.parse(notification.createdAt)));
-        assert.equal((await request('/notifications', { cookie: user.cookie })).data.unreadCount, 1, 'Viewing does not silently mark read');
+        assert.equal((await request('/notifications', { cookie: user.cookie })).data.unreadCount, expected, 'Viewing does not silently mark read');
     }
     for (const user of [removed, unrelated, owner]) {
         assert.deepEqual((await request('/notifications', { cookie: user.cookie })).data, { notifications: [], unreadCount: 0 });
@@ -409,7 +410,11 @@ test('Old events remain readable but cannot accept self or manual registrations;
 async function administrator(f) {
     const user = await f.account();
     const { grantAdmin } = require('../scripts/grant-admin.cjs');
-    await grantAdmin(f.db, user.email);
+    const existing = await f.db.get("SELECT email FROM users WHERE role = 'admin' LIMIT 1");
+    if (existing) {
+        const adminLogin = await f.request('/login', { method: 'POST', body: { email: existing.email, password: 'demo-password' } });
+        assert.equal((await f.request('/admin/users/' + user.id + '/role', { method: 'PUT', cookie: adminLogin.cookie.split(';')[0], body: { role: 'admin', reason: 'Test delegation' } })).status, 200);
+    } else await grantAdmin(f.db, user.email);
     assert.equal((await f.request('/me', { cookie: user.cookie })).status, 401);
     const login = await f.request('/login', { method: 'POST', body: { email: user.email, password: 'demo-password' } });
     return { ...user, cookie: login.cookie.split(';')[0] };
@@ -620,4 +625,72 @@ test('Only admins restore future cancelled events; retain bookings and notify ev
  assert.equal((await f.request('/events/' + id)).data.status, 'cancelled');
  assert.equal((await f.db.get('SELECT count(*) AS n FROM notifications')).n, before);
  assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'restore_event'")).n, 2);
+});
+
+test('Admin delegation is controlled, audited, notified and revokes sessions; bootstrap is first-admin only', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), target = await f.account(), admin = await administrator(f);
+ const change = (cookie, id, role, reason = 'Team management') => f.request('/admin/users/' + id + '/role', { method: 'PUT', cookie, body: { role, reason } });
+ for (const cookie of [undefined, owner.cookie, target.cookie]) assert.equal((await change(cookie, target.id, 'admin')).status, cookie ? 403 : 401);
+ assert.equal((await change(admin.cookie, target.id, 'admin', '')).status, 400);
+ assert.equal((await change(admin.cookie, admin.id, 'attendee')).status, 409);
+ await assert.rejects(require('../scripts/grant-admin.cjs').grantAdmin(f.db, target.email), /already exists/);
+ assert.equal((await change(admin.cookie, target.id, 'admin')).status, 200);
+ assert.equal((await f.request('/me', { cookie: target.cookie })).status, 401);
+ const login = await f.request('/login', { method: 'POST', body: { email: target.email, password: 'demo-password' } });
+ const cookie2 = login.cookie.split(';')[0];
+ assert.equal(login.data.user.role, 'admin');
+ const notice = (await f.request('/notifications', { cookie: cookie2 })).data.notifications[0];
+ assert.match(notice.type, /^role_changed:/);
+ assert.match(notice.message, /Team management/);
+ assert.match(notice.message, /attendee → admin/);
+ const results = await Promise.all([change(admin.cookie, admin.id, 'attendee'), change(cookie2, target.id, 'organizer')]);
+ assert.equal(results.filter(r => r.status === 200).length, 1);
+ assert.equal((await f.db.get("SELECT count(*) AS n FROM users WHERE role = 'admin' AND status = 'active'")).n, 1);
+ assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'change_role'")).n, 2);
+});
+
+test('Role notification failure rolls back role, audit and session revocation', async t => {
+ const f = await fixture(t), target = await f.account(), admin = await administrator(f);
+ await f.db.run("CREATE TRIGGER fail_role BEFORE INSERT ON notifications WHEN NEW.type LIKE 'role_changed:%' BEGIN SELECT RAISE(ABORT, 'test role notification failure'); END");
+ assert.equal((await f.request('/admin/users/' + target.id + '/role', { method: 'PUT', cookie: admin.cookie, body: { role: 'admin', reason: 'Team' } })).status, 500);
+ assert.equal((await f.request('/me', { cookie: target.cookie })).data.user.role, 'attendee');
+ assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'change_role'")).n, 0);
+});
+
+test('Event detail changes notify current attendees, preserve isolation and roll back on notification failure', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), other = await f.account('organizer'), user = await f.account(), departed = await f.account(), admin = await administrator(f);
+ const id = await f.event(owner);
+ for (const who of [user, departed]) await f.request('/events/' + id + '/register', { method: 'POST', cookie: who.cookie });
+ await f.request('/events/' + id + '/register', { method: 'DELETE', cookie: departed.cookie });
+ const put = (cookie, body) => f.request('/events/' + id, { method: 'PUT', cookie, body });
+ const updated = { ...eventData, location: 'Room 201', reason: 'Venue change' };
+ assert.equal((await put(owner.cookie, updated)).status, 200);
+ let list = (await f.request('/notifications', { cookie: user.cookie })).data.notifications;
+ assert.equal(list.length, 1); assert.match(list[0].message, /Venue change/); assert.match(list[0].message, /UON → Room 201/);
+ assert.equal((await put(owner.cookie, updated)).status, 200);
+ assert.equal((await f.request('/notifications', { cookie: user.cookie })).data.notifications.length, 1, 'No-op edits do not notify attendees');
+ assert.equal((await put(admin.cookie, { ...updated, time: '15:00', moderationReason: 'Reschedule' })).status, 200);
+ assert.equal((await f.request('/notifications', { cookie: user.cookie })).data.notifications.length, 2);
+ assert.equal((await f.request('/notifications', { cookie: owner.cookie })).data.notifications.length, 1);
+ for (const who of [other, departed]) assert.equal((await f.request('/notifications', { cookie: who.cookie })).data.notifications.length, 0);
+ await f.db.run("CREATE TRIGGER fail_change BEFORE INSERT ON notifications WHEN NEW.type LIKE 'event_details_changed:%' BEGIN SELECT RAISE(ABORT, 'test event notification failure'); END");
+ assert.equal((await put(owner.cookie, { ...updated, location: 'Library' })).status, 500);
+ assert.equal((await f.request('/events/' + id)).data.location, 'Room 201');
+});
+
+test('Manual registration notices go only to the affected attendee, repeat safely and are atomic', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), other = await f.account();
+ const id = await f.event(owner);
+ const add = () => f.request('/events/' + id + '/attendees', { method: 'POST', cookie: owner.cookie, body: { userId: user.id, reason: 'Requested by attendee' } });
+ const remove = () => f.request('/events/' + id + '/attendees/' + user.id, { method: 'DELETE', cookie: owner.cookie, body: { reason: 'No longer attending' } });
+ for (let n = 0; n < 2; n++) {
+   assert.equal((await add()).status, 201); assert.equal((await add()).status, 409);
+   assert.equal((await remove()).status, 200); assert.equal((await remove()).status, 404);
+ }
+ const list = (await f.request('/notifications', { cookie: user.cookie })).data.notifications;
+ assert.equal(list.length, 4); assert.match(list[0].message, /No longer attending/);
+ assert.equal((await f.request('/notifications', { cookie: other.cookie })).data.notifications.length, 0);
+ await f.db.run("CREATE TRIGGER fail_manual BEFORE INSERT ON notifications WHEN NEW.type LIKE 'registration_%' BEGIN SELECT RAISE(ABORT, 'test manual notification failure'); END");
+ assert.equal((await add()).status, 500);
+ assert.equal((await f.request('/events/' + id)).data.registeredCount, 0);
 });

@@ -9,6 +9,7 @@ export default function AttendeeManager({ event, onChange }) {
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const endpoint = '/events/' + event.id + '/attendees';
@@ -37,7 +38,7 @@ export default function AttendeeManager({ event, onChange }) {
     try {
       await api(endpoint + (remove ? '/' + user.id : ''), {
         method: remove ? 'DELETE' : 'POST',
-        ...(remove ? {} : { body: JSON.stringify({ userId: user.id }) }),
+        body: JSON.stringify({ ...(remove ? {} : { userId: user.id }), reason }),
       });
       await Promise.all([load(), onChange()]);
       setMessage(user.firstName + (remove ? ' was removed from this event.' : ' was registered for this event.'));
@@ -47,6 +48,8 @@ export default function AttendeeManager({ event, onChange }) {
   return <section className="panel" aria-labelledby="attendees-heading">
     <h2 id="attendees-heading">Attendee Management</h2>
     <p className="count">{event.registeredCount} / {event.capacity} registered</p>
+    <label>Message to attendee (optional)<textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={500} placeholder="Explain why you are adding or removing this attendee." /></label>
+    <p className="muted">Adding or removing an attendee sends them a notification.</p>
     {loading && <p role="status">Loading attendees…</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {message && <p role="status" className="success">{message}</p>}

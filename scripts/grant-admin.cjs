@@ -6,6 +6,7 @@ async function grantAdmin(db, email) {
     if (!user) throw new Error('Register this account normally first, then run this command again.');
     if (user.status !== 'active') throw new Error('A suspended account cannot become an administrator.');
     if (user.role === 'admin') return false;
+    if (await tx.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1")) throw new Error('An administrator already exists. Use Administration to assign further administrators.');
     await tx.run("UPDATE users SET role = 'admin' WHERE id = ?", [user.id]);
     await tx.run('DELETE FROM sessions WHERE userId = ?', [user.id]);
     await tx.run("INSERT INTO admin_audit (actorId, action, targetType, targetId, reason, details) VALUES (?, 'grant_admin', 'user', ?, 'Granted by trusted local CLI', ?)",

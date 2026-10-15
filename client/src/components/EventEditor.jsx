@@ -84,7 +84,7 @@ export default function EventEditor({ editing = false }) {
     setBusy(true); setError('');
     try {
       const result = await api(editing ? '/events/' + id : '/events', {
-        method: editing ? 'PUT' : 'POST', body: JSON.stringify({ ...form, capacity: Number(form.capacity), ...(user.role === 'admin' ? { moderationReason } : {}) }),
+        method: editing ? 'PUT' : 'POST', body: JSON.stringify({ ...form, capacity: Number(form.capacity), ...(user.role === 'admin' ? { moderationReason } : editing ? { reason: moderationReason } : {}) }),
       });
       navigate('/events/' + (editing ? id : result.eventId));
     } catch (err) { setError(err.message); }
@@ -132,6 +132,8 @@ export default function EventEditor({ editing = false }) {
       </label>
       <p className="muted">Capacity is the maximum number of attendees. It cannot be lower than the current registration count.</p>
       {user.role === 'admin' && <label>Management reason<textarea value={moderationReason} onChange={e => setModerationReason(e.target.value)} required maxLength={500} placeholder="Explain this administrative edit." /></label>}
+      {editing && user.role !== 'admin' && <label>Change reason (optional)<textarea value={moderationReason} onChange={e => setModerationReason(e.target.value)} maxLength={500} placeholder="Explain the change to registered attendees." /></label>}
+      {editing && <p className="muted">Changes to event details notify registered attendees.</p>}
       {editing && <p className="muted">Existing text is preserved. If it exceeds the new limits, shorten it before saving.</p>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions"><Link className="action secondary" to={editing ? '/events/' + id : '/events'}>Back</Link>

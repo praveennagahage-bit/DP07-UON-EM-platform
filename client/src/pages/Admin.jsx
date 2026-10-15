@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { api } from '../api';
 
 export default function Admin() {
@@ -14,6 +15,10 @@ export default function Admin() {
   </main>;
 }
 function AdminList({ tab }) {
+  const { user, logout } = useAuth();
+  const [roleTarget, setRoleTarget] = useState(null);
+  const [nextRole, setNextRole] = useState('attendee');
+  const [roleReason, setRoleReason] = useState('');
   const [rows, setRows] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,17 @@ function AdminList({ tab }) {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
+  async function changeRole(e) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const result = await api('/admin/users/' + roleTarget.id + '/role', { method: 'PUT', body: JSON.stringify({ role: roleTarget.role === 'admin' ? nextRole : 'admin', reason: roleReason }) });
+      if (roleTarget.id === user.id) { await logout(); return; }
+      setRoleTarget(null); setMessage(result.message); await refresh();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
   async function changeStatus(e) {
     e.preventDefault();
     if (busy) return;
@@ -63,6 +79,14 @@ function AdminList({ tab }) {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success" role="status">{message}</p>}
+    {roleTarget && <form className="panel event-form" onSubmit={changeRole}>
+      <h2>{roleTarget.role === 'admin' ? 'Revoke administrator access' : 'Grant administrator access'}</h2>
+      <p>{roleTarget.firstName} {roleTarget.lastName} · {roleTarget.email}</p>
+      <p className="muted">Administrators can manage all events and accounts. This change signs the affected account out and sends a notification. At least one active administrator must remain.</p>
+      {roleTarget.role === 'admin' && <label>Role after removal<select value={nextRole} onChange={e => setNextRole(e.target.value)}><option value="attendee">Attendee</option><option value="organizer">Organizer</option></select></label>}
+      <label>Role change reason<textarea value={roleReason} onChange={e => setRoleReason(e.target.value)} maxLength={500} required /></label>
+      <div className="actions"><button type="button" className="action secondary" disabled={busy} onClick={() => setRoleTarget(null)}>Cancel</button><button className="action" disabled={busy || !roleReason.trim()}>Confirm role change</button></div>
+    </form>}
     {selected && <form className="panel event-form" onSubmit={changeStatus}>
       <h2>{selected.status === 'active' ? 'Suspend' : 'Restore'} {selected.firstName} {selected.lastName}</h2>
       <p>{selected.email}</p>
@@ -76,6 +100,7 @@ function AdminList({ tab }) {
         {filtered.map(row => <article className="admin-row" key={row.id}>
           {tab === 'users' ? <>
             <h2>{row.firstName} {row.lastName}</h2><p>{row.email}</p><p>{row.role} · {row.status === 'banned' ? 'Suspended' : 'Active'}</p>
+            {row.status === 'active' && <button className="action" disabled={busy} onClick={() => { setRoleTarget(row); setRoleReason(''); setNextRole('attendee'); setSelected(null); }}>{row.role === 'admin' ? 'Revoke admin access' : 'Grant admin access'}</button>}
             {row.banReason && <p className="cancellation">Reason: {row.banReason}</p>}
             {row.role === 'admin' ? <p className="muted">Protected administrator account</p> : <button className="action secondary" disabled={busy} onClick={() => { setSelected(row); setReason(''); setMessage(''); }}>{row.status === 'active' ? 'Suspend account' : 'Restore account'}</button>}
           </> : tab === 'events' ? <>

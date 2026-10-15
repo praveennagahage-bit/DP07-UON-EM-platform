@@ -126,7 +126,7 @@ npm run build
 
 The integration tests create isolated databases and exercise real HTTP requests: session expiry/logout/rotation, forged identity,
 role restrictions, cross-organizer ownership enforcement, registration isolation, duplicates, concurrent last-seat booking, capacity changes,
-cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (31 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
+cancellation, origin checks and migration from the previous schema. Search and notification tests cover literal query matching, recipients, ownership, read state, duplicate prevention and atomic rollback. Image round-trips, corrupt/oversized uploads, unchanged-image edits, invalid/past dates and started-event registration are also covered (35 tests in total, including featured-event tests and the latest validation, profile and Admin coverage). They do not modify the project users.db.
 
 Browser verification uses a separate temporary database and covers login/refresh/logout, attendee booking/cancellation,
 organizer editing and attendee management, cancellation visibility and protected routes. Additional browser checks cover search, empty results, unread badges, single/all-read actions, reload persistence and account isolation.
@@ -142,3 +142,9 @@ npm run admin:grant -- registered-email@example.com --confirm
 Use the same DB_PATH as the backend. This changes the existing role and revokes sessions; sign in again. No default administrator credentials are supplied. Public registration and Profile cannot grant Admin. Admin cannot suspend other administrators. Moderation requires a reason; booked events must be cancelled with notifications, not permanently deleted. See [管理员与本轮 Demo 指南](docs/ADMIN_GUIDE.zh-CN.md).
 
 Mobile browser checks cover 360/390/430-pixel layouts; physical phone keyboard/touch validation remains a manual follow-up.
+
+## Admin delegation and targeted updates
+
+The local admin command now bootstraps only the first administrator. Existing admins grant/revoke admin access in Administration → Users via PUT /admin/users/:id/role (role and reason). Revocation selects attendee or organizer; at least one active admin must remain. Role changes invalidate all target sessions, create a personal notification and retain an audit record in one transaction.
+
+Event text-field edits notify current registrants with old/new values (admin edits also notify the creator). Organizer manual registration/removal notifies the affected attendee; optional reason fields provide context. Unchanged edits and image-only edits do not notify registrants. These writes and notifications are atomic. Existing cancellation/restoration notifications remain supported.

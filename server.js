@@ -135,9 +135,27 @@ function createApp(db, options = {}) {
             return result;
         });
     }
+    async function organizerTransaction(req, work) {
+        return db.transaction(async tx => {
+            const actor = await tx.get('SELECT role, status FROM users WHERE id = ?', [req.user.id]);
+            const event = await tx.get('SELECT * FROM events WHERE id = ?', [req.params.id]);
+            if (actor?.role !== 'organizer' || actor.status !== 'active') throw fail(403, 'Organizer access required');
+            if (!event) throw fail(404, 'Event not found');
+            if (event.createdBy !== req.user.id) throw fail(403, 'Only the event creator can manage it');
+            return work(tx, event);
+        });
+    }
+    async function notify(tx, userId, eventId, type, title, message) {
+        await tx.run('INSERT INTO notifications (userId, eventId, type, eventTitle, message) VALUES (?, ?, ?, ?, ?)',
+            [userId, eventId, type, title, message]);
+    }
+    function optionalReason(value, fallback) {
+        return value === undefined || value === '' ? fallback : moderationReason(value);
+    }
+
     const manageEvent = (req, action, work) => req.user.role === 'admin'
         ? auditChange(req, action, 'event', req.params.id, moderationReason(req.body.moderationReason || req.body.reason), work)
-        : work(db);
+        : organizerTransaction(req, work);
 
     app.get('/', (req, res) => res.send('Server is running!'));
 
@@ -228,7 +246,16 @@ function createApp(db, options = {}) {
         const result = await tx.run(`UPDATE events SET title = ?, description = ?, date = ?, time = ?, location = ?, category = ?, capacity = ?, image = CASE WHEN ? THEN ? ELSE image END
             WHERE id = ? AND status = 'active'`, [...values, image !== undefined ? 1 : 0, image || null, req.params.id]);
         if (!result.changes) throw fail(409, 'Cancelled events cannot be edited');
-        return { audit: { before, after: { title: values[0], description: values[1], date: values[2], time: values[3], location: values[4], category: values[5], capacity: values[6] }, imageChanged: image !== undefined } };
+        const after = { title: values[0], description: values[1], date: values[2], time: values[3], location: values[4], category: values[5], capacity: values[6] };
+        const labels = { title: 'Title', description: 'Description', date: 'Date', time: 'Time (Australia/Sydney)', location: 'Location', category: 'Category', capacity: 'Capacity' };
+        const changes = Object.keys(labels).filter(key => before[key] !== after[key]).map(key => labels[key] + ': ' + (before[key] ?? '') + ' → ' + after[key]);
+        if (changes.length) {
+            const reason = req.user.role === 'admin' ? moderationReason(req.body.moderationReason || req.body.reason) : optionalReason(req.body.reason, 'The organizer updated the event details.');
+            const recipients = await tx.all('SELECT userId FROM registrations WHERE eventId = ? AND userId != ?', [req.params.id, req.user.role === 'admin' ? req.event.createdBy || 0 : 0]);
+            const type = 'event_details_changed:' + randomBytes(16).toString('hex');
+            for (const { userId } of recipients) await notify(tx, userId, Number(req.params.id), type, after.title, reason + '\n\nChanges:\n' + changes.join('\n'));
+        }
+        return { audit: { before, after, imageChanged: image !== undefined } };
         });
         res.json({ message: 'Event updated successfully' });
     });
@@ -303,14 +330,28 @@ function createApp(db, options = {}) {
             AND (instr(lower(firstName || ' ' || lastName), lower(?)) > 0 OR instr(lower(email), lower(?)) > 0)
             ORDER BY firstName, lastName, id LIMIT 30`, [query, query]));
     });
+    async function changeAttendee(req, removing) {
+        const reason = optionalReason(req.body.reason, removing ? 'The organizer removed your registration.' : 'The organizer registered you for this event.');
+        const userId = removing ? Number(req.params.userId) : req.body.userId;
+        await organizerTransaction(req, async (tx, event) => {
+            if (removing) {
+                const result = await tx.run('DELETE FROM registrations WHERE eventId = ? AND userId = ?', [event.id, userId]);
+                if (!result.changes) throw fail(404, 'Registration not found');
+            } else {
+                if (!isFutureEvent(event.date, event.time)) throw fail(409, 'Registration is closed because this event has already started');
+                await tx.run('INSERT INTO registrations (eventId, userId) VALUES (?, ?)', [event.id, userId]);
+            }
+            await notify(tx, userId, event.id, (removing ? 'registration_removed:' : 'registration_added:') + randomBytes(16).toString('hex'), event.title, reason);
+        });
+    }
     app.post('/events/:id/attendees', organizer, ownsEvent, async (req, res) => {
         if (!Number.isSafeInteger(req.body.userId) || req.body.userId < 1) throw fail(400, 'Select an attendee');
-        await register(req.params.id, req.body.userId);
+        await changeAttendee(req, false);
         res.status(201).json({ message: 'Attendee registered' });
     });
     app.delete('/events/:id/attendees/:userId', organizer, ownsEvent, async (req, res) => {
         if (!/^[1-9]\d*$/.test(req.params.userId)) throw fail(400, 'Invalid attendee ID');
-        await unregister(req.params.id, Number(req.params.userId));
+        await changeAttendee(req, true);
         res.json({ message: 'Attendee removed' });
     });
 
@@ -318,6 +359,28 @@ function createApp(db, options = {}) {
         const q = text(req.query.q);
         res.json(await db.all(`SELECT id, firstName, lastName, email, role, status, banReason FROM users
             WHERE instr(lower(firstName || ' ' || lastName || ' ' || email), lower(?)) > 0 ORDER BY id DESC`, [q]));
+    });
+    app.put('/admin/users/:id/role', admin, async (req, res) => {
+        const role = req.body.role;
+        if (!['admin', 'organizer', 'attendee'].includes(role)) throw fail(400, 'Select a valid role');
+        const reason = moderationReason(req.body.reason);
+        await auditChange(req, 'change_role', 'user', req.params.id, reason, async tx => {
+            const target = await tx.get('SELECT id, role, status FROM users WHERE id = ?', [req.params.id]);
+            if (!target) throw fail(404, 'User not found');
+            if (target.status !== 'active') throw fail(409, 'Restore the account before changing its role');
+            if (target.role === role) throw fail(409, 'Account already has this role');
+            if (target.role !== 'admin' && role !== 'admin') throw fail(400, 'This operation only grants or revokes administrator access');
+            if (target.role === 'admin') {
+                const count = await tx.get("SELECT count(*) AS n FROM users WHERE role = 'admin' AND status = 'active'");
+                if (count.n <= 1) throw fail(409, 'At least one active administrator must remain');
+            }
+            await tx.run('UPDATE users SET role = ? WHERE id = ?', [role, target.id]);
+            await tx.run('DELETE FROM sessions WHERE userId = ?', [target.id]);
+            await notify(tx, target.id, null, 'role_changed:' + randomBytes(16).toString('hex'), 'Account role changed',
+                reason + '\n\nRole: ' + target.role + ' → ' + role + '\nPlease sign in again.');
+            return { audit: { from: target.role, to: role } };
+        });
+        res.json({ message: 'Role updated and user notified. The affected account must sign in again.' });
     });
     app.put('/admin/users/:id/status', admin, async (req, res) => {
         if (!['active', 'banned'].includes(req.body.status)) throw fail(400, 'Select active or banned');
