@@ -11,6 +11,7 @@ const notificationLabels = {
   event_details_changed: ['Event Details Changed', 'Details of an event you registered for have changed.'],
   registration_added: ['Registration Added', 'The organizer registered you for this event.'],
   registration_removed: ['Registration Removed', 'The organizer removed your registration for this event.'],
+  report_reviewed: ['Report Reviewed', 'An administrator has reviewed your event report.'],
   role_changed: ['Account Role Changed', 'An administrator changed your account role.'],
 };
 const labelFor = item => notificationLabels[item.type.split(':')[0]] || ['Notification', 'You have a new update.'];

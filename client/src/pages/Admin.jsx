@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import ContentModeration from '../components/ContentModeration';
 import { api } from '../api';
 
 export default function Admin() {
@@ -9,9 +10,9 @@ export default function Admin() {
     <h1>Administration</h1>
     <p className="muted">Manage accounts and events across the platform. Changes require a reason and are recorded.</p>
     <div className="actions admin-tabs" aria-label="Administration sections">
-      {['users', 'events', 'audit'].map(item => <button key={item} className={'action' + (item === tab ? '' : ' secondary')} aria-pressed={item === tab} onClick={() => setTab(item)}>{ { users: 'Users', events: 'All Events', audit: 'Activity Log' }[item]}</button>)}
+      {['users', 'events', 'keywords', 'reports', 'audit'].map(item => <button key={item} className={'action' + (item === tab ? '' : ' secondary')} aria-pressed={item === tab} onClick={() => setTab(item)}>{ { users: 'Users', events: 'All Events', audit: 'Activity Log', keywords: 'Keywords', reports: 'Reports' }[item]}</button>)}
     </div>
-    <AdminList key={tab} tab={tab} />
+    {['keywords', 'reports'].includes(tab) ? <ContentModeration key={tab} kind={tab} /> : <AdminList key={tab} tab={tab} />}
   </main>;
 }
 function AdminList({ tab }) {

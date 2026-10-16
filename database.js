@@ -119,6 +119,20 @@ async function createDatabase(filename = process.env.DB_PATH || path.join(__dirn
         CREATE TRIGGER IF NOT EXISTS reject_banned_registration BEFORE INSERT ON registrations
         WHEN (SELECT status FROM users WHERE id = NEW.userId) = 'banned'
         BEGIN SELECT RAISE(ABORT, 'Account is suspended'); END;`);
+        await exec(`CREATE TABLE IF NOT EXISTS blocked_keywords (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL, normalized TEXT NOT NULL UNIQUE,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1))
+        );
+        CREATE TABLE IF NOT EXISTS event_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reporterId INTEGER NOT NULL REFERENCES users(id),
+            eventId INTEGER REFERENCES events(id) ON DELETE SET NULL,
+            eventTitle TEXT NOT NULL, reason TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','resolved','dismissed')),
+            resolution TEXT NOT NULL DEFAULT '',
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS one_pending_report ON event_reports(reporterId,eventId) WHERE status = 'pending';`);
         // Serialize access to this connection: transactions must not include another
         // request's writes or expose partially updated data to concurrent readers.
         let queue = Promise.resolve();

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { api } from '../api';
 import RegistrationButton from '../components/RegistrationButton';
 import { isFutureEvent } from '../../../shared/eventTime.mjs';
+import ReportEvent from '../components/ReportEvent';
 import AttendeeManager from '../components/AttendeeManager';
 
 export default function EventDetails() {
@@ -66,6 +67,7 @@ export default function EventDetails() {
       <RegistrationButton event={event} onChange={reload} />
       {canManage && event.status === 'active' && <Link className="action" to={endpoint + '/edit'}>Edit Event</Link>}
     </article>
+    {user && <ReportEvent key={id} eventId={id} />}
     {canManage && <>
       {user.role === 'organizer' && <AttendeeManager key={id} event={event} onChange={reload} />}
       <section className="panel">

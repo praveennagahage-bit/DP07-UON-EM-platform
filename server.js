@@ -1,3 +1,4 @@
+const { normalize, checkEventKeywords } = require('./contentModeration');
 const { decodeEventImage } = require('./eventImage');
 const { eventTimestamp, isFutureEvent } = require('./shared/eventTime.mjs');
 const { eventInputErrors, profileInputErrors, textError } = require('./shared/validation.mjs');
@@ -105,7 +106,7 @@ function createApp(db, options = {}) {
             if (actor?.role !== 'admin' || actor.status !== 'active') throw fail(403, 'Administrator access required');
             const result = await work(tx);
             const auditRecord = await tx.run('INSERT INTO admin_audit (actorId, action, targetType, targetId, reason, details) VALUES (?, ?, ?, ?, ?, ?)',
-                [req.user.id, action, targetType, Number(targetId), reason, JSON.stringify(result?.audit || {})]);
+                [req.user.id, action, targetType, result?.auditTargetId ?? Number(targetId), reason, JSON.stringify(result?.audit || {})]);
             // Notify only the event owner, in the same transaction as moderation.
             // Each edit has its own audit ID so repeated edits retain separate notices.
             if (targetType === 'event' && req.event.createdBy) {
@@ -234,14 +235,18 @@ function createApp(db, options = {}) {
     app.post('/events', organizer, async (req, res) => {
         const values = eventValues(req.body);
         const image = await decodeEventImage(req.body.image);
-        const result = await db.run('INSERT INTO events (title, description, date, time, location, category, capacity, createdBy, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        const result = await db.transaction(async tx => {
+        await checkEventKeywords(tx, req.body);
+        return tx.run('INSERT INTO events (title, description, date, time, location, category, capacity, createdBy, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [...values, req.user.id, image || null]);
+        });
         res.status(201).json({ message: 'Event created successfully', eventId: result.id });
     });
     app.put('/events/:id', eventManager, ownsEvent, async (req, res) => {
         const values = eventValues(req.body);
         const image = await decodeEventImage(req.body.image);
         await manageEvent(req, 'edit_event', async tx => {
+        await checkEventKeywords(tx, req.body);
         const before = await tx.get('SELECT title, description, date, time, location, category, capacity FROM events WHERE id = ?', [req.params.id]);
         const result = await tx.run(`UPDATE events SET title = ?, description = ?, date = ?, time = ?, location = ?, category = ?, capacity = ?, image = CASE WHEN ? THEN ? ELSE image END
             WHERE id = ? AND status = 'active'`, [...values, image !== undefined ? 1 : 0, image || null, req.params.id]);
@@ -400,6 +405,63 @@ function createApp(db, options = {}) {
         if (!Number.isSafeInteger(before) || before < 1) throw fail(400, 'Invalid audit cursor');
         res.json(await db.all(`SELECT admin_audit.*, users.firstName, users.lastName FROM admin_audit
             JOIN users ON users.id = actorId WHERE admin_audit.id < ? ORDER BY admin_audit.id DESC LIMIT 50`, [before]));
+    });
+
+    app.get('/admin/keywords', admin, async (req, res) => {
+        res.json(await db.all('SELECT id, phrase, enabled FROM blocked_keywords ORDER BY id DESC'));
+    });
+    app.post('/admin/keywords', admin, async (req, res) => {
+        const phrase = moderationReason(req.body.phrase);
+        if (Array.from(phrase).length > 100 || Array.from(normalize(phrase)).length < 2) throw fail(400, 'Use a phrase of 2–100 characters');
+        const reason = moderationReason(req.body.reason);
+        await auditChange(req, 'add_keyword', 'keyword', 0, reason, async tx => {
+            if (await tx.get('SELECT id FROM blocked_keywords WHERE normalized = ?', [normalize(phrase)])) throw fail(409, 'This phrase already exists');
+            const added = await tx.run('INSERT INTO blocked_keywords (phrase, normalized) VALUES (?, ?)', [phrase, normalize(phrase)]);
+            return { auditTargetId: added.id, audit: { keywordId: added.id, phrase } };
+        });
+        res.status(201).json({ message: 'Keyword enabled. New event submissions and edits will be checked.' });
+    });
+    app.put('/admin/keywords/:id', admin, async (req, res) => {
+        if (typeof req.body.enabled !== 'boolean') throw fail(400, 'Select enabled or disabled');
+        await auditChange(req, 'set_keyword', 'keyword', req.params.id, moderationReason(req.body.reason), async tx => {
+            const row = await tx.get('SELECT * FROM blocked_keywords WHERE id = ?', [req.params.id]);
+            if (!row) throw fail(404, 'Keyword not found');
+            await tx.run('UPDATE blocked_keywords SET enabled = ? WHERE id = ?', [req.body.enabled ? 1 : 0, row.id]);
+            return { audit: { phrase: row.phrase, enabled: req.body.enabled } };
+        });
+        res.json({ message: 'Keyword rule updated.' });
+    });
+    app.post('/events/:id/reports', requireUser, async (req, res) => {
+        const reason = moderationReason(req.body.reason);
+        await db.transaction(async tx => {
+            const actor = await tx.get("SELECT id FROM users WHERE id = ? AND status = 'active'", [req.user.id]);
+            if (!actor) throw fail(401, 'Please sign in to continue');
+            const event = await tx.get('SELECT id, title FROM events WHERE id = ?', [req.params.id]);
+            if (!event) throw fail(404, 'Event not found');
+            if (await tx.get("SELECT id FROM event_reports WHERE eventId = ? AND reporterId = ? AND status = 'pending'", [event.id, actor.id])) throw fail(409, 'You already have a pending report for this event');
+            const recent = await tx.get("SELECT count(*) AS n FROM event_reports WHERE reporterId = ? AND createdAt >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour')", [actor.id]);
+            if (recent.n >= 5) throw fail(429, 'You can submit up to five reports per hour. Please try again later.');
+            await tx.run('INSERT INTO event_reports (reporterId, eventId, eventTitle, reason) VALUES (?, ?, ?, ?)', [actor.id, event.id, event.title, reason]);
+        });
+        res.status(201).json({ message: 'Report submitted for administrator review. Your identity is not shared with the event organizer.' });
+    });
+    app.get('/admin/reports', admin, async (req, res) => {
+        const before = req.query.before === undefined ? Number.MAX_SAFE_INTEGER : Number(req.query.before);
+        if (!Number.isSafeInteger(before) || before < 1) throw fail(400, 'Invalid cursor');
+        res.json(await db.all('SELECT * FROM event_reports WHERE id < ? ORDER BY id DESC LIMIT 50', [before]));
+    });
+    app.put('/admin/reports/:id', admin, async (req, res) => {
+        if (!['resolved', 'dismissed'].includes(req.body.status)) throw fail(400, 'Choose resolved or dismissed');
+        const reason = moderationReason(req.body.reason);
+        await auditChange(req, 'review_report', 'report', req.params.id, reason, async tx => {
+            const report = await tx.get('SELECT * FROM event_reports WHERE id = ?', [req.params.id]);
+            if (!report) throw fail(404, 'Report not found');
+            if (report.status !== 'pending') throw fail(409, 'Report has already been reviewed');
+            await tx.run('UPDATE event_reports SET status = ?, resolution = ? WHERE id = ?', [req.body.status, reason, report.id]);
+            await notify(tx, report.reporterId, report.eventId, 'report_reviewed:' + report.id, report.eventTitle, 'Report ' + req.body.status + ': ' + reason);
+            return { audit: { status: req.body.status, eventId: report.eventId } };
+        });
+        res.json({ message: 'Report reviewed and reporter notified.' });
     });
 
     // Notification ownership always comes from the authenticated session.

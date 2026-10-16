@@ -694,3 +694,59 @@ test('Manual registration notices go only to the affected attendee, repeat safel
  assert.equal((await add()).status, 500);
  assert.equal((await f.request('/events/' + id)).data.registeredCount, 0);
 });
+
+test('Keyword rules are admin-only, normalized and enforced for creation and all edits', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), admin = await administrator(f);
+ const id = await f.event(owner);
+ const rule = { phrase: 'Demo Block', reason: 'Demo policy' };
+ assert.equal((await f.request('/admin/keywords', { method: 'POST', cookie: owner.cookie, body: rule })).status, 403);
+ assert.equal((await f.request('/admin/keywords', { method: 'POST', cookie: admin.cookie, body: rule })).status, 201);
+ assert.equal((await f.request('/admin/keywords', { method: 'POST', cookie: admin.cookie, body: { ...rule, phrase: 'ＤＥＭＯ　ＢＬＯＣＫ' } })).status, 409);
+ for (const field of ['title','description','location']) {
+   const body = { ...eventData, [field]: 'DEMO   BLO\u200bCK' };
+   assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body })).status, 400);
+   for (const who of [owner,admin]) assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: who.cookie, body: { ...body, moderationReason: 'Review' } })).status, 400);
+ }
+ assert.equal((await f.request('/events/' + id)).data.title, eventData.title);
+ const keyword = (await f.request('/admin/keywords', { cookie: admin.cookie })).data[0];
+ assert.equal((await f.request('/admin/keywords/' + keyword.id, { method: 'PUT', cookie: admin.cookie, body: { enabled: false, reason: 'False positive' } })).status, 200);
+ assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: { ...eventData, title: 'Demo Block' } })).status, 201);
+});
+
+test('Reports enforce identity, deduplicate concurrent submissions and notify only the reporter on review', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), other = await f.account(), admin = await administrator(f);
+ const id = await f.event(owner);
+ const submit = cookie => f.request('/events/' + id + '/reports', { method: 'POST', cookie, body: { reason: 'Misleading activity details', reporterId: other.id } });
+ assert.equal((await submit()).status, 401);
+ const results = await Promise.all([submit(user.cookie),submit(user.cookie)]);
+ assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
+ assert.equal((await f.request('/admin/reports', { cookie: owner.cookie })).status, 403);
+ const report = (await f.request('/admin/reports', { cookie: admin.cookie })).data[0];
+ assert.equal(report.reporterId,user.id);
+ assert.equal((await f.request('/events/' + id)).data.status,'active');
+ const review = body => f.request('/admin/reports/' + report.id, { method:'PUT',cookie:admin.cookie,body });
+ assert.equal((await review({status:'dismissed',reason:''})).status,400);
+ assert.equal((await review({status:'dismissed',reason:'Reviewed; no policy violation'})).status,200);
+ assert.equal((await review({status:'resolved',reason:'Again'})).status,409);
+ const notes=(await f.request('/notifications',{cookie:user.cookie})).data.notifications;
+ assert.equal(notes.length,1);assert.match(notes[0].message,/no policy violation/);
+ assert.equal((await f.request('/notifications',{cookie:other.cookie})).data.notifications.length,0);
+ assert.equal((await f.request('/notifications',{cookie:owner.cookie})).data.notifications.length,0);
+ await f.request('/events/' + id, {method:'DELETE',cookie:owner.cookie});
+ const saved=(await f.request('/admin/reports',{cookie:admin.cookie})).data[0];
+ assert.equal(saved.eventId,null);assert.equal(saved.eventTitle,eventData.title);
+ assert.equal((await f.request('/notifications',{cookie:user.cookie})).data.notifications[0].eventId,null);
+});
+
+test('Report review rolls back on notification failure; reporting is rate limited', async t => {
+ const f=await fixture(t),owner=await f.account('organizer'),user=await f.account(),admin=await administrator(f);
+ for(let n=0;n<6;n++){
+   const id=await f.event(owner);
+   assert.equal((await f.request('/events/'+id+'/reports',{method:'POST',cookie:user.cookie,body:{reason:'Concern'}})).status,n<5?201:429);
+ }
+ const report=(await f.request('/admin/reports',{cookie:admin.cookie})).data[0];
+ await f.db.run("CREATE TRIGGER fail_report BEFORE INSERT ON notifications WHEN NEW.type LIKE 'report_reviewed:%' BEGIN SELECT RAISE(ABORT,'test report notice failure'); END");
+ assert.equal((await f.request('/admin/reports/'+report.id,{method:'PUT',cookie:admin.cookie,body:{status:'resolved',reason:'Handled'}})).status,500);
+ assert.equal((await f.db.get('SELECT status FROM event_reports WHERE id = ?',[report.id])).status,'pending');
+ assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'review_report'")).n,0);
+});
