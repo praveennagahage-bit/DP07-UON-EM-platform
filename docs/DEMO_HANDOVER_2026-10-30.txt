@@ -1,0 +1,106 @@
+UON EVENT PLATFORM - NEW FEATURES DEMO GUIDE
+Prepared: 30 October 2026 | Suggested duration: 6-8 minutes
+Feature commit: 76b1806 (main)
+
+BEFORE THE DEMO
+1. Open the correct project folder. Check git status, then run git pull --ff-only
+   on main. If there are local changes or a divergent history, stop and resolve
+   them without overwriting anyone's work.
+2. Install dependencies in the root and client folders with npm install if needed.
+3. In the root, configure a LOCAL .env file:
+   OPENAI_API_KEY=your-own-valid-key
+   AI_MODERATION_MODE=required
+   Use the .env.example template from GitHub. Never share or commit a real key.
+   Restart the backend with npm start, then in a second terminal run:
+   cd client
+   npm run dev
+   Open http://localhost:5173.
+4. GitHub contains the code, NOT Xintao's local database, accounts or API key.
+   Set up your own Admin, Organizer and Attendee accounts before presenting.
+   For a fresh database, register the intended admin account normally, then run:
+   npm run admin:grant -- your-registered-email --confirm
+   This provisions only the first admin. Later admins are assigned through
+   Administration by an existing admin. Log in again after the role change.
+5. Prepare an upcoming event owned by the Organizer and register the Attendee
+   for it. Use separate browser profiles/private windows, or log out before
+   switching roles; tabs in one browser profile share the login session.
+6. Verify Administration > Overview > Content review shows AI is enabled.
+   This confirms configuration, not a successful API call. Save one harmless
+   test event before the presentation to verify the real API works.
+
+1. ADMIN STATISTICS (ABOUT 1 MINUTE)
+- Log in as Admin and open Administration > Overview.
+- Show total users, roles, active/suspended accounts, event counts, bookings,
+  distinct booked users and pending reports. Click Refresh statistics.
+- Explain: these are real database totals, not hard-coded demo numbers.
+  Booking count differs from unique users. Cancelled events are separate from
+  upcoming/started events; their retained bookings are included in total bookings.
+  Event times use Australia/Sydney. Only admins can see global statistics.
+
+2. BUTTON LAYOUT (ABOUT 30 SECONDS)
+- Open Administration > Users.
+- Show that Grant/Revoke admin access and Suspend/Restore account buttons now
+  have consistent widths and spacing. Resize the browser to show the narrow layout.
+- Do not grant or revoke roles just to demonstrate styling.
+
+3. ADMIN MESSAGE TO ORGANIZER (ABOUT 1 MINUTE)
+- Administration > Messages: search for the Organizer and tick their checkbox.
+- Subject: Event preparation
+- Message: Please remind attendees to bring water and arrive 10 minutes early.
+- Click Send notification and show the recipient-count confirmation.
+- Log in as that Organizer, open Notifications (or the bell), and show the
+  sender, subject, message and timestamp. Mark the message as read.
+- Explain: Admin can select active users, including organizers.
+
+4. ORGANIZER MESSAGE TO ATTENDEES (ABOUT 1 MINUTE)
+- As Organizer, open the event YOU CREATED.
+- Find Message registered attendees.
+- Subject: Bring water
+- Message: Please bring water and arrive 10 minutes before the event starts.
+- Send it. Switch to the registered Attendee and open Notifications.
+- Show the message, event link and Mark as Read.
+- Explain: Organizer can message only their own event's registered attendees;
+  they cannot send to another organizer's event or arbitrary platform users.
+  A send with no active recipients is rejected. Sent history is available below
+  the message form. Messages are in-app notifications, not email or live chat.
+
+5. AI CONTENT REVIEW (ABOUT 2 MINUTES)
+- As Organizer, create a normal future event, for example:
+  Title: Campus Study Group
+  Description: A friendly study session. Bring a notebook and water.
+  Location: University Library
+  Category: Social | Capacity: 10
+  Choose a FUTURE date/time in Australia/Sydney. Save successfully.
+- Explain: title, description and location pass local keyword checks first,
+  then the OpenAI moderation API. Images are not AI-reviewed in this version.
+- Demonstrate rejection by editing that test event using clearly harmful TEST
+  text. Example title: Violent attack meetup
+  Example description: Join us to attack and kill students on campus. We will
+  deliberately hurt people.
+  This text is only a moderation test. Do not publish or promote a real threat.
+- Save. If the message starts 'AI review flagged', the AI blocked the update.
+  If it says 'contains a prohibited phrase', the keyword layer blocked it
+  BEFORE the AI call. Explain the distinction; do not claim it is an AI result.
+- Return to the event and show that its original safe content remains unchanged.
+- Explain: both create and edit use the same backend review, including admin
+  edits. When AI is required but unavailable, saving is blocked instead of
+  silently bypassing the review. Users can contact an admin about a false positive;
+  user reporting and manual moderation remain available.
+
+IF SOMETHING DOES NOT WORK
+- Old interface: confirm main is updated, restart backend/frontend, refresh browser.
+- AI disabled: configure the local key and required mode, then restart npm start.
+- AI temporarily unavailable: check key permissions, network and provider access.
+  Do not present keyword-only checking as working AI. Show the other features
+  and describe the failure honestly; don't expose the key on screen.
+- No event recipients: register an active Attendee for that Organizer's event.
+- Missing notification: confirm the exact recipient account and press Refresh.
+- Sending too quickly: limit is 5 sends per sender per minute; wait and retry.
+
+VALIDATION ALREADY COMPLETED
+- 45 automated tests passed; frontend lint and production build passed.
+- Desktop and 390px mobile browser checks passed for layout and messaging.
+- On 30 October, real OpenAI API tests passed on Xintao's machine:
+  normal create allowed; harmful create blocked; harmful edit blocked with original
+  data preserved; normal edit allowed. These used a temporary in-memory database.
+- Your computer still needs its own working local configuration and rehearsal.
