@@ -8,9 +8,9 @@ const { createDatabase } = require('../database');
 const { createApp } = require('../server');
 
 const eventData = { title: 'Workshop', description: 'Integration test', date: '2099-12-20', time: '14:00', location: 'UON', category: 'Workshop', capacity: 2 };
-async function fixture(t) {
+async function fixture(t, options = { moderation: { mode: 'keywords' } }) {
     const db = await createDatabase(':memory:');
-    const server = createApp(db).listen(0, '127.0.0.1');
+    const server = createApp(db, options).listen(0, '127.0.0.1');
     await once(server, 'listening');
     const url = 'http://127.0.0.1:' + server.address().port;
     t.after(async () => { await new Promise(resolve => server.close(resolve)); await db.close(); });
@@ -736,6 +736,82 @@ test('Reports enforce identity, deduplicate concurrent submissions and notify on
  const saved=(await f.request('/admin/reports',{cookie:admin.cookie})).data[0];
  assert.equal(saved.eventId,null);assert.equal(saved.eventTitle,eventData.title);
  assert.equal((await f.request('/notifications',{cookie:user.cookie})).data.notifications[0].eventId,null);
+});
+
+test('Dashboard statistics are admin-only and separate cancelled events, bookings and distinct people', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+ assert.equal((await f.request('/admin/statistics')).status, 401);
+ assert.equal((await f.request('/admin/statistics', { cookie: owner.cookie })).status, 403);
+ const first = await f.event(owner), second = await f.event(owner);
+ for (const id of [first, second]) await f.request('/events/' + id + '/register', { method: 'POST', cookie: user.cookie });
+ await f.request('/events/' + second + '/cancel', { method: 'POST', cookie: owner.cookie, body: { reason: 'Unavailable' } });
+ const past = await f.event(owner);
+ await f.db.run("UPDATE events SET date = '2020-01-01' WHERE id = ?", [past]);
+ const stats = (await f.request('/admin/statistics', { cookie: admin.cookie })).data;
+ assert.deepEqual(stats.events, { total: 3, cancelled: 1, upcoming: 1, started: 1 });
+ assert.deepEqual(stats.registrations, { total: 2, people: 1, activeEventBookings: 1 });
+ assert.equal(stats.users.reduce((n, row) => n + row.count, 0), 3);
+ assert.equal(stats.pendingReports, 0);
+});
+
+test('Messages enforce audience permissions, deduplicate recipients, preserve sender and integrate unread notifications', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), other = await f.account('organizer'), alice = await f.account(), bob = await f.account(), admin = await administrator(f);
+ const id = await f.event(owner);
+ await f.request('/events/' + id + '/register', { method: 'POST', cookie: alice.cookie });
+ const body = { audience: 'event', eventId: id, title: 'Bring water', body: 'Please arrive early.' };
+ for (const [cookie, status] of [[undefined, 401], [alice.cookie, 403], [other.cookie, 403]]) assert.equal((await f.request('/messages', { method: 'POST', cookie, body })).status, status);
+ assert.equal((await f.request('/messages', { method: 'POST', cookie: owner.cookie, body: { ...body, audience: 'users', userIds: [bob.id] } })).status, 403);
+ assert.equal((await f.request('/messages', { method: 'POST', cookie: owner.cookie, body })).data.recipientCount, 1);
+ const notice = (await f.request('/notifications', { cookie: alice.cookie })).data;
+ assert.equal(notice.unreadCount, 1);
+ assert.match(notice.notifications[0].message, /\(organizer\)/);
+ assert.equal(notice.notifications[0].eventTitle, 'Bring water');
+ assert.equal(notice.notifications[0].eventId, id);
+ assert.equal((await f.request('/notifications', { cookie: bob.cookie })).data.unreadCount, 0);
+ const direct = await f.request('/messages', { method: 'POST', cookie: admin.cookie, body: { ...body, audience: 'users', userIds: [owner.id, owner.id, bob.id] } });
+ assert.equal(direct.status, 201); assert.equal(direct.data.recipientCount, 2);
+ assert.equal((await f.request('/notifications', { cookie: owner.cookie })).data.notifications[0].eventId, null);
+ assert.equal((await f.request('/messages/sent', { cookie: other.cookie })).data.length, 0);
+ assert.equal((await f.request('/messages/sent', { cookie: owner.cookie })).data.length, 1);
+ assert.equal((await f.request('/messages/sent', { cookie: alice.cookie })).status, 403);
+});
+
+test('Message validation, empty audiences, suspended recipients, rate limits and rollback prevent partial delivery', async t => {
+ const f = await fixture(t), owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f);
+ const id = await f.event(owner);
+ const body = { audience: 'users', userIds: [user.id], title: 'Notice', body: 'Bring water' };
+ for (const bad of [{ title: '' }, { body: '<script>' }, { title: 'x'.repeat(101) }, { body: 'x'.repeat(1001) }, { userIds: [0] }]) assert.equal((await f.request('/messages', { method: 'POST', cookie: admin.cookie, body: { ...body, ...bad } })).status, 400);
+ assert.equal((await f.request('/messages', { method: 'POST', cookie: owner.cookie, body: { ...body, audience: 'event', eventId: id } })).status, 400);
+ await f.db.run("UPDATE users SET status = 'banned' WHERE id = ?", [user.id]);
+ assert.equal((await f.request('/messages', { method: 'POST', cookie: admin.cookie, body })).status, 400);
+ await f.db.run("UPDATE users SET status = 'active' WHERE id = ?", [user.id]);
+ await f.db.run("CREATE TRIGGER fail_message BEFORE INSERT ON notifications WHEN NEW.type LIKE 'message:%' BEGIN SELECT RAISE(ABORT,'message delivery failure'); END");
+ assert.equal((await f.request('/messages', { method: 'POST', cookie: admin.cookie, body })).status, 500);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM sent_messages')).n, 0);
+ await f.db.run('DROP TRIGGER fail_message');
+ const results = await Promise.all(Array.from({ length: 6 }, () => f.request('/messages', { method: 'POST', cookie: admin.cookie, body })));
+ assert.deepEqual(results.map(r => r.status).sort(), [201, 201, 201, 201, 201, 429]);
+ assert.equal((await f.db.get("SELECT COUNT(*) AS n FROM notifications WHERE type LIKE 'message:%'")).n, 5);
+});
+
+test('AI blocks create and admin/owner edits, retains saved data on failure, and keyword rules run before the API', async t => {
+ let flagged = false, calls = 0, unavailable = false;
+ const f = await fixture(t, { moderation: { mode: 'required', apiKey: 'test-only', fetchImpl: async () => { calls++; if (unavailable) throw new Error('offline'); return { ok: true, json: async () => ({ results: [{ flagged }] }) }; } } });
+ const owner = await f.account('organizer'), admin = await administrator(f);
+ const id = await f.event(owner);
+ flagged = true;
+ assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: eventData })).status, 422);
+ for (const actor of [owner, admin]) assert.equal((await f.request('/events/' + id, { method: 'PUT', cookie: actor.cookie, body: { ...eventData, title: 'Blocked edit', moderationReason: 'Review' } })).status, 422);
+ assert.equal((await f.request('/events/' + id)).data.title, eventData.title);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM events')).n, 1);
+ unavailable = true;
+ const response = await f.request('/events', { method: 'POST', cookie: owner.cookie, body: eventData });
+ assert.equal(response.status, 503); assert.match(response.data.message, /temporarily unavailable/);
+ await f.db.run("INSERT INTO blocked_keywords (phrase, normalized) VALUES ('workshop', 'workshop')");
+ const previous = calls;
+ assert.equal((await f.request('/events', { method: 'POST', cookie: owner.cookie, body: eventData })).status, 400);
+ assert.equal(calls, previous);
+ assert.deepEqual((await f.request('/moderation/status', { cookie: admin.cookie })).data, { mode: 'required', configured: true, model: 'omni-moderation-latest' });
 });
 
 test('Report review rolls back on notification failure; reporting is rate limited', async t => {

@@ -153,6 +153,21 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
 .admin-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
 .admin-row { min-width: 0; border: 1px solid #444; border-radius: 8px; padding: 18px; overflow-wrap: anywhere; }
 .admin-row pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.admin-row { display: flex; flex-direction: column; }
+.admin-user-actions { display: grid; gap: 12px; margin-top: auto; padding-top: 12px; }
+.admin-user-actions .action { width: 100%; min-height: 44px; white-space: normal; box-sizing: border-box; }
+.admin-user-actions p { margin: 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 16px; }
+.stat-card { padding: 18px; border: 1px solid #36534d; border-radius: 8px; display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.stat-card strong { font-size: 30px; color: #32d6b5; }
+.recipient-picker { min-width: 0; border: 1px solid #555; border-radius: 8px; }
+.recipient-list { max-height: 260px; overflow-y: auto; margin-top: 12px; }
+.recipient-option { display: flex !important; align-items: center; gap: 12px; padding: 10px 0; overflow-wrap: anywhere; }
+.recipient-option input { width: 20px; height: 20px; flex: 0 0 20px; }
+.recipient-option span { min-width: 0; }
+.recipient-option small { display: block; }
+.sent-history { margin-top: 24px; }
+.sent-history article { border-top: 1px solid #444; margin-top: 16px; overflow-wrap: anywhere; }
 input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: #ffaaaa; }
 .auth-shell { height: auto; min-height: calc(100vh - 100px); overflow: visible; }
 .auth-form-wrap, .auth-left-content { height: auto; }

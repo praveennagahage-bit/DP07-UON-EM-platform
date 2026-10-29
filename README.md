@@ -154,3 +154,7 @@ Event text-field edits notify current registrants with old/new values (admin edi
 Admin manages initially empty blocking rules in Administration → Keywords. Backend create/edit checks titles, descriptions and locations with normalized literal substring matching (NFKC, case, whitespace and zero-width separators). Rules can be disabled; existing events are not retroactively removed. This is text filtering, not semantic or image moderation.
 
 Authenticated users report events from their details page. One pending report per user/event and five reports per hour limit duplicates and abuse. Admin reviews Reports, opens the event for any separate moderation action, and resolves/dismisses with a response notifying the reporter. Reporter identity is private from organizers. Report snapshots survive event deletion. Rule changes and report decisions are audited.
+
+## October 29 features
+
+See [the feature and demo guide](docs/FEATURES_2026-10-29.zh-CN.md) for AI moderation, administrator statistics, direct/event messages and button layout changes. The backend reads an optional root `.env` with `npm start`; `.env.example` documents the settings. AI review requires a locally configured API key. Without a key and explicit mode, only keyword checks run and the UI states that AI is disabled.

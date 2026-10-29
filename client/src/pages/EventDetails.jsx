@@ -6,6 +6,7 @@ import RegistrationButton from '../components/RegistrationButton';
 import { isFutureEvent } from '../../../shared/eventTime.mjs';
 import ReportEvent from '../components/ReportEvent';
 import AttendeeManager from '../components/AttendeeManager';
+import MessageComposer from '../components/MessageComposer';
 
 export default function EventDetails() {
   const { id } = useParams();
@@ -69,6 +70,7 @@ export default function EventDetails() {
     </article>
     {user && <ReportEvent key={id} eventId={id} />}
     {canManage && <>
+      <MessageComposer key={'message-' + id} eventId={id} />
       {user.role === 'organizer' && <AttendeeManager key={id} event={event} onChange={reload} />}
       <section className="panel">
         <h2>Event Administration</h2>

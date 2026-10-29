@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import ContentModeration from '../components/ContentModeration';
+import AdminDashboard from '../components/AdminDashboard';
+import MessageComposer from '../components/MessageComposer';
 import { api } from '../api';
 
 export default function Admin() {
-  const [tab, setTab] = useState('users');
+  const [tab, setTab] = useState('overview');
   return <main className="page">
     <h1>Administration</h1>
     <p className="muted">Manage accounts and events across the platform. Changes require a reason and are recorded.</p>
     <div className="actions admin-tabs" aria-label="Administration sections">
-      {['users', 'events', 'keywords', 'reports', 'audit'].map(item => <button key={item} className={'action' + (item === tab ? '' : ' secondary')} aria-pressed={item === tab} onClick={() => setTab(item)}>{ { users: 'Users', events: 'All Events', audit: 'Activity Log', keywords: 'Keywords', reports: 'Reports' }[item]}</button>)}
+      {['overview', 'users', 'events', 'messages', 'keywords', 'reports', 'audit'].map(item => <button key={item} className={'action' + (item === tab ? '' : ' secondary')} aria-pressed={item === tab} onClick={() => setTab(item)}>{ { overview: 'Overview', messages: 'Messages', users: 'Users', events: 'All Events', audit: 'Activity Log', keywords: 'Keywords', reports: 'Reports' }[item]}</button>)}
     </div>
-    {['keywords', 'reports'].includes(tab) ? <ContentModeration key={tab} kind={tab} /> : <AdminList key={tab} tab={tab} />}
+    {tab === 'overview' ? <AdminDashboard /> : tab === 'messages' ? <MessageComposer /> : ['keywords', 'reports'].includes(tab) ? <ContentModeration key={tab} kind={tab} /> : <AdminList key={tab} tab={tab} />}
   </main>;
 }
 function AdminList({ tab }) {
@@ -101,9 +103,11 @@ function AdminList({ tab }) {
         {filtered.map(row => <article className="admin-row" key={row.id}>
           {tab === 'users' ? <>
             <h2>{row.firstName} {row.lastName}</h2><p>{row.email}</p><p>{row.role} · {row.status === 'banned' ? 'Suspended' : 'Active'}</p>
-            {row.status === 'active' && <button className="action" disabled={busy} onClick={() => { setRoleTarget(row); setRoleReason(''); setNextRole('attendee'); setSelected(null); }}>{row.role === 'admin' ? 'Revoke admin access' : 'Grant admin access'}</button>}
             {row.banReason && <p className="cancellation">Reason: {row.banReason}</p>}
+            <div className="admin-user-actions">
+            {row.status === 'active' && <button className="action" disabled={busy} onClick={() => { setRoleTarget(row); setRoleReason(''); setNextRole('attendee'); setSelected(null); }}>{row.role === 'admin' ? 'Revoke admin access' : 'Grant admin access'}</button>}
             {row.role === 'admin' ? <p className="muted">Protected administrator account</p> : <button className="action secondary" disabled={busy} onClick={() => { setSelected(row); setReason(''); setMessage(''); }}>{row.status === 'active' ? 'Suspend account' : 'Restore account'}</button>}
+            </div>
           </> : tab === 'events' ? <>
             <h2>{row.title}</h2><p>{row.category} · {row.status} · {row.registeredCount} / {row.capacity} registered</p>
             <p className="muted">Owner: {row.firstName ? row.firstName + ' ' + row.lastName : 'Legacy event without an owner'}</p>

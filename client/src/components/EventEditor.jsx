@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { LIMITS, characterCount, eventInputErrors, textError } from '../../../shared/validation.mjs';
 import TimePicker from './TimePicker';
+import ModerationNotice from './ModerationNotice';
 
 export default function EventEditor({ editing = false }) {
   const { id } = useParams();
@@ -95,6 +96,7 @@ export default function EventEditor({ editing = false }) {
   const preview = form.image === undefined ? existingImage : form.image;
   return <main className="page editor-page"><section className="panel">
     <p className="eyebrow">{user.role === 'admin' ? 'Administration' : 'Organizer'}</p><h1>{editing ? 'Edit Event' : 'Create Event'}</h1>
+    <ModerationNotice />
     <form className="event-form" onSubmit={save} noValidate>
       <label>Event title<input name="title" value={form.title} onChange={change} required aria-invalid={Boolean(fieldErrors.title)} aria-describedby="title-help" />
         <span id="title-help" className={characterCount(form.title.trim()) > LIMITS.title ? 'error' : 'muted'}>{characterCount(form.title.trim())} / {LIMITS.title} characters, including spaces and punctuation.</span>

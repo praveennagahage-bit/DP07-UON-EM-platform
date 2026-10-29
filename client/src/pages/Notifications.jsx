@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../notifications/NotificationsContext';
 
 const notificationLabels = {
+  message: ['Message', 'A message from your administrator or event organizer.'],
   event_cancelled: ['Event Cancelled', 'This event has been cancelled.'],
   event_restored: ['Event Restored by Admin', 'An administrator has restored this event. Existing bookings are still valid.'],
   event_updated: ['Event Updated by Admin', 'An administrator has edited your event.'],
@@ -58,7 +59,7 @@ function NotificationList() {
       <p className="cancellation" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.message}</p>
       <time className="muted" dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
       <div className="actions notification-actions">
-        {item.eventId ? <Link className="action secondary" to={'/events/' + item.eventId}>View Event</Link> : item.type.startsWith('role_changed:') ? null : <span className="muted">This event is no longer available.</span>}
+        {item.eventId ? <Link className="action secondary" to={'/events/' + item.eventId}>View Event</Link> : /^(role_changed|message):/.test(item.type) ? null : <span className="muted">This event is no longer available.</span>}
         {!item.isRead && <button className="action" disabled={busy} onClick={() => read(item.id)}>Mark as Read</button>}
       </div>
     </article>)}</div>

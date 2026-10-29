@@ -133,6 +133,15 @@ async function createDatabase(filename = process.env.DB_PATH || path.join(__dirn
             createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
         );
         CREATE UNIQUE INDEX IF NOT EXISTS one_pending_report ON event_reports(reporterId,eventId) WHERE status = 'pending';`);
+        await exec(`CREATE TABLE IF NOT EXISTS sent_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            senderId INTEGER NOT NULL REFERENCES users(id),
+            title TEXT NOT NULL, body TEXT NOT NULL,
+            eventId INTEGER REFERENCES events(id) ON DELETE SET NULL,
+            recipientCount INTEGER NOT NULL,
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        );
+        CREATE INDEX IF NOT EXISTS messages_sender ON sent_messages(senderId, createdAt);`);
         // Serialize access to this connection: transactions must not include another
         // request's writes or expose partially updated data to concurrent readers.
         let queue = Promise.resolve();

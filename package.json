@@ -8,7 +8,7 @@
     "sqlite3": "^6.0.1"
   },
   "scripts": {
-    "start": "node server.js",
+    "start": "node --env-file-if-exists=.env server.js",
     "test": "node --test",
     "admin:grant": "node scripts/grant-admin.cjs"
   }

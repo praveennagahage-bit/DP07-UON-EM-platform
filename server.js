@@ -1,4 +1,6 @@
 const { normalize, checkEventKeywords } = require('./contentModeration');
+const { createModerator } = require('./aiModeration');
+const { installAdminFeatures } = require('./adminFeatures');
 const { decodeEventImage } = require('./eventImage');
 const { eventTimestamp, isFutureEvent } = require('./shared/eventTime.mjs');
 const { eventInputErrors, profileInputErrors, textError } = require('./shared/validation.mjs');
@@ -20,6 +22,20 @@ const publicUser = user => ({
 
 function createApp(db, options = {}) {
     const app = express();
+    const moderator = createModerator(options.moderation);
+    const reviewAttempts = new Map();
+    async function reviewEvent(req) {
+        await checkEventKeywords(db, req.body);
+        if (moderator.status.mode === 'required') {
+            const now = Date.now();
+            for (const [id, entry] of reviewAttempts) if (entry.until <= now) reviewAttempts.delete(id);
+            const entry = reviewAttempts.get(req.user.id) || { until: now + 60000, count: 0 };
+            if (entry.count >= 10) throw fail(429, 'Too many content review attempts. Please try again in a minute.');
+            entry.count++;
+            reviewAttempts.set(req.user.id, entry);
+        }
+        await moderator.check(req.body);
+    }
     const origins = options.origins || (process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173').split(',').map(value => value.trim());
     const cookieOptions = { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' };
     app.disable('x-powered-by');
@@ -158,6 +174,8 @@ function createApp(db, options = {}) {
         ? auditChange(req, action, 'event', req.params.id, moderationReason(req.body.moderationReason || req.body.reason), work)
         : organizerTransaction(req, work);
 
+    installAdminFeatures(app, db, { admin, eventManager, moderator });
+
     app.get('/', (req, res) => res.send('Server is running!'));
 
     // USER REGISTER: role selection is retained for the coursework demo.
@@ -235,7 +253,10 @@ function createApp(db, options = {}) {
     app.post('/events', organizer, async (req, res) => {
         const values = eventValues(req.body);
         const image = await decodeEventImage(req.body.image);
+        await reviewEvent(req);
         const result = await db.transaction(async tx => {
+        const actor = await tx.get('SELECT role, status FROM users WHERE id = ?', [req.user.id]);
+        if (actor?.role !== 'organizer' || actor.status !== 'active') throw fail(403, 'Organizer access required');
         await checkEventKeywords(tx, req.body);
         return tx.run('INSERT INTO events (title, description, date, time, location, category, capacity, createdBy, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [...values, req.user.id, image || null]);
@@ -245,6 +266,7 @@ function createApp(db, options = {}) {
     app.put('/events/:id', eventManager, ownsEvent, async (req, res) => {
         const values = eventValues(req.body);
         const image = await decodeEventImage(req.body.image);
+        await reviewEvent(req);
         await manageEvent(req, 'edit_event', async tx => {
         await checkEventKeywords(tx, req.body);
         const before = await tx.get('SELECT title, description, date, time, location, category, capacity FROM events WHERE id = ?', [req.params.id]);
@@ -490,7 +512,7 @@ function createApp(db, options = {}) {
         if (error.message.includes('UNIQUE constraint failed: users.email')) return res.status(409).json({ message: 'Email already exists' });
         const status = error.status || 500;
         if (status >= 500) console.error(error);
-        res.status(status).json({ message: status >= 500 ? 'An unexpected server error occurred' : error.message });
+        res.status(status).json({ message: status >= 500 && !error.publicMessage ? 'An unexpected server error occurred' : error.message });
     });
     return app;
 }
