@@ -826,3 +826,39 @@ test('Report review rolls back on notification failure; reporting is rate limite
  assert.equal((await f.db.get('SELECT status FROM event_reports WHERE id = ?',[report.id])).status,'pending');
  assert.equal((await f.db.get("SELECT count(*) AS n FROM admin_audit WHERE action = 'review_report'")).n,0);
 });
+
+test('Message AI reviews both roles, fails closed, sends only text and rechecks permissions after review', async t => {
+ let flagged = false, offline = false, revoke = false, calls = 0;
+ const f = await fixture(t, { moderation: { mode: 'required', apiKey: 'test-only', fetchImpl: async (url, options) => {
+  calls++;
+  const input = JSON.parse(options.body).input;
+  assert.match(input, /^Subject: Reminder\nMessage: Bring water$/);
+  if (offline) throw new Error('offline');
+  if (revoke) await f.db.run("UPDATE users SET status='banned' WHERE id=?", [owner.id]);
+  return { ok: true, json: async () => ({ results: [{ flagged }] }) };
+ } } });
+ const owner = await f.account('organizer'), user = await f.account(), admin = await administrator(f), other = await f.account('organizer');
+ const ev = await f.db.run("INSERT INTO events(title,description,date,time,location,category,capacity,createdBy) VALUES ('Walk','','2099-12-20','14:00','Library','Social',10,?)", [owner.id]);
+ await f.db.run('INSERT INTO registrations(userId,eventId) VALUES (?,?)', [user.id,ev.id]);
+ const body = { title:'Reminder', body:'Bring water', audience:'event',eventId:ev.id };
+ assert.equal((await f.request('/messages',{method:'POST',cookie:other.cookie,body})).status,403);
+ assert.equal(calls,0);
+ flagged=true;
+ for (const actor of [owner,admin]) assert.equal((await f.request('/messages',{method:'POST',cookie:actor.cookie,body})).status,422);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM sent_messages')).n,0);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM notifications')).n,0);
+ flagged=false; offline=true;
+ const failure=await f.request('/messages',{method:'POST',cookie:admin.cookie,body});
+ assert.equal(failure.status,503);assert.match(failure.data.message,/message has not been sent/);
+ offline=false;
+ assert.equal((await f.request('/messages',{method:'POST',cookie:admin.cookie,body:{...body,audience:'users',userIds:[user.id]}})).status,201);
+ revoke=true;
+ assert.equal((await f.request('/messages',{method:'POST',cookie:owner.cookie,body})).status,403);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM sent_messages')).n,1);
+ assert.equal((await f.db.get('SELECT COUNT(*) AS n FROM notifications')).n,1);
+ revoke=false;
+ await f.db.run("INSERT INTO blocked_keywords(phrase,normalized) VALUES ('water','water')");
+ const before=calls;
+ assert.equal((await f.request('/messages',{method:'POST',cookie:admin.cookie,body})).status,400);
+ assert.equal(calls,before);
+});

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ModerationNotice from './ModerationNotice';
 import { api } from '../api';
 
 export default function MessageComposer({ eventId }) {
@@ -36,6 +37,7 @@ export default function MessageComposer({ eventId }) {
   return <section className="panel">
     <h2>{eventId ? 'Message registered attendees' : 'Send a message'}</h2>
     <p className="muted">{eventId ? 'Send to all currently registered, active accounts for this event, including cancelled events.' : 'Choose active users or organizers. To message an event’s attendees, open its management page.'} Messages appear in Notifications. Up to 5 sends per minute.</p>
+    <ModerationNotice message />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success" role="status">{message}</p>}
     {loading && <p role="status">Loading…</p>}

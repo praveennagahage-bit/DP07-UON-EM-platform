@@ -104,3 +104,14 @@ VALIDATION ALREADY COMPLETED
   normal create allowed; harmful create blocked; harmful edit blocked with original
   data preserved; normal edit allowed. These used a temporary in-memory database.
 - Your computer still needs its own working local configuration and rehearsal.
+
+
+UPDATE 6 NOVEMBER: MESSAGE MODERATION
+- Start the backend with npm start to load the local .env file.
+- Set AI_MODERATION_MODE=required and configure OPENAI_API_KEY locally. Never commit the key.
+- Admin direct messages and organizer/event attendee messages both check the subject and body against keywords and AI before delivery.
+- Demo a normal reminder: Please bring water and arrive ten minutes early. Confirm it appears in the recipient Notifications.
+- Demo rejected content in a test account: a prohibited keyword should block delivery. To demonstrate AI specifically, use harmful text that does not match a configured keyword.
+- Rejected messages and unavailable AI reviews create no notifications; the form retains the text for correction/retry.
+- Delivery permissions are rechecked after review. Limits: 5 successful sends and 10 AI review attempts per account per minute.
+- Validation: 46 automated tests passed; live AI allowed a normal reminder and blocked a threat in an isolated in-memory database.

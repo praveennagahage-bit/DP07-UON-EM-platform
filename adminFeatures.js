@@ -1,8 +1,10 @@
+const { checkEventKeywords } = require('./contentModeration');
 const { textError } = require('./shared/validation.mjs');
 const { isFutureEvent } = require('./shared/eventTime.mjs');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 function installAdminFeatures(app, db, { admin, eventManager, moderator }) {
+    const reviewAttempts = new Map();
     app.get('/moderation/status', eventManager, (req, res) => res.json(moderator.status));
     app.get('/admin/statistics', admin, async (req, res) => {
         const result = await db.transaction(async tx => {
@@ -33,7 +35,7 @@ function installAdminFeatures(app, db, { admin, eventManager, moderator }) {
         if (!['event', 'users'].includes(audience)) throw fail(400, 'Select a valid audience');
         if (audience === 'event' && (!Number.isSafeInteger(eventId) || eventId < 1)) throw fail(400, 'Select an event');
         if (audience === 'users' && (!Array.isArray(userIds) || !userIds.length || userIds.length > 100 || userIds.some(id => !Number.isSafeInteger(id) || id < 1))) throw fail(400, 'Select between 1 and 100 valid recipients');
-        const result = await db.transaction(async tx => {
+        async function validateDelivery(tx) {
             const actor = await tx.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
             if (!actor || actor.status !== 'active' || !['admin', 'organizer'].includes(actor.role)) throw fail(403, 'Messaging access required');
             let recipients;
@@ -51,6 +53,24 @@ function installAdminFeatures(app, db, { admin, eventManager, moderator }) {
             if (!recipients.length) throw fail(400, 'There are no active recipients for this event');
             const recent = await tx.get("SELECT COUNT(*) AS count FROM sent_messages WHERE senderId = ? AND createdAt >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute')", [actor.id]);
             if (recent.count >= 5) throw fail(429, 'Please wait a minute before sending more messages');
+            return { actor, recipients };
+        }
+        // Authorize before calling the external service; never hold the database
+        // transaction open during network I/O. Revalidate at delivery time.
+        await db.transaction(validateDelivery);
+        await checkEventKeywords(db, { title, description: body });
+        if (moderator.status.mode === 'required') {
+            const now = Date.now();
+            for (const [id, entry] of reviewAttempts) if (entry.until <= now) reviewAttempts.delete(id);
+            const entry = reviewAttempts.get(req.user.id) || { until: now + 60000, count: 0 };
+            if (entry.count >= 10) throw fail(429, 'Too many message review attempts. Please wait a minute.');
+            entry.count++;
+            reviewAttempts.set(req.user.id, entry);
+        }
+        await moderator.check({ title, body }, 'message');
+        const result = await db.transaction(async tx => {
+            const { actor, recipients } = await validateDelivery(tx);
+            await checkEventKeywords(tx, { title, description: body });
             const record = await tx.run('INSERT INTO sent_messages (senderId, title, body, eventId, recipientCount) VALUES (?, ?, ?, ?, ?)', [actor.id, title.trim(), body.trim(), audience === 'event' ? eventId : null, recipients.length]);
             for (const recipient of recipients) await tx.run('INSERT INTO notifications (userId, eventId, type, eventTitle, message) VALUES (?, ?, ?, ?, ?)',
                 [recipient.id, audience === 'event' ? eventId : null, 'message:' + record.id, title.trim(), 'From: ' + actor.firstName + ' ' + actor.lastName + ' (' + actor.role + ')\n\n' + body.trim()]);
